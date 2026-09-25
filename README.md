@@ -12,6 +12,14 @@
 
 Node.js가 없다면 https://nodejs.org (LTS 버전) 설치 후 진행하세요.
 
+### 빌드가 실패할 때 (dist 폴더가 안 생길 때)
+
+`build.bat`는 `npm run dist`의 전체 출력을 이 폴더의 `build.log`에도 저장합니다.
+가장 흔한 원인은 Windows "개발자 모드"가 꺼져 있어서 electron-builder가 내부적으로
+필요한 심볼릭 링크를 만들지 못하는 경우입니다 (`build.log`에 "symbolic link" 또는
+"privilege" 같은 단어가 보이면 이 경우) — 설정 → 개인 정보 및 보안 → 개발자용 →
+"개발자 모드" 켜기, 또는 `build.bat`를 관리자 권한으로 실행 후 다시 시도하세요.
+
 ## 개발 중 실행 (빌드 없이 바로 테스트)
 
 ```
