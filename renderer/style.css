@@ -93,16 +93,25 @@ html, body {
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-#pin-btn:hover { background: var(--glass-bg-strong); color: var(--text); }
+#pin-btn:hover { background: var(--glass-bg-strong); }
 #gear-btn:hover { background: var(--glass-bg-strong); color: var(--text); }
 #close-btn:hover { background: var(--accent); color: white; }
 
-#pin-btn[aria-pressed="true"] {
-  background: var(--accent);
-  color: white;
+/* Pin toggle: a hollow (stroke-only) circle when off, a solid (filled)
+   circle when the window size is locked. */
+#pin-btn svg circle {
+  fill: none;
+  stroke: white;
+  stroke-width: 2;
 }
-#pin-btn[aria-pressed="true"]:hover { filter: brightness(1.12); }
+#pin-btn[aria-pressed="true"] svg circle {
+  fill: white;
+  stroke: none;
+}
 
 main {
   flex: 1;
@@ -189,6 +198,15 @@ button {
   -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 button:hover { background: rgba(255, 255, 255, 0.16); }
+#start-pause-btn {
+  width: 44px;
+  padding: 8px;
+}
+#start-pause-btn svg { fill: currentColor; }
+#start-pause-btn #pause-icon { display: none; }
+#start-pause-btn.running #play-icon { display: none; }
+#start-pause-btn.running #pause-icon { display: inline; }
+
 button.primary {
   background: var(--accent);
   border-color: var(--accent);

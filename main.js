@@ -156,7 +156,9 @@ ipcMain.handle('window:setAlwaysOnTop', (_evt, flag) => {
 
 ipcMain.handle('window:setSizeLocked', (_evt, flag) => {
   mainWindow.setResizable(!flag);
-  return saveSettings({ sizeLocked: !!flag }).sizeLocked;
+  const sizeLocked = saveSettings({ sizeLocked: !!flag }).sizeLocked;
+  const [width, height] = mainWindow.getSize();
+  return { sizeLocked, width, height };
 });
 
 ipcMain.handle('window:setMinimizeToTray', (_evt, flag) => {
@@ -194,7 +196,14 @@ ipcMain.handle('window:snapToCorner', (_evt, { displayId, corner }) => {
 });
 
 ipcMain.handle('window:resize', (_evt, { width, height }) => {
+  // setSize() is unreliable on at least some platforms while resizable is
+  // false (reproduced even with no app code involved) - briefly unlock
+  // around our own programmatic resize, then restore the lock. The window
+  // is never draggable-by-the-user in between: this all runs synchronously.
+  const wasLocked = !mainWindow.isResizable();
+  if (wasLocked) mainWindow.setResizable(true);
   mainWindow.setSize(Math.round(width), Math.round(height), true);
+  if (wasLocked) mainWindow.setResizable(false);
 });
 
 ipcMain.handle('notify', (_evt, { title, body }) => {

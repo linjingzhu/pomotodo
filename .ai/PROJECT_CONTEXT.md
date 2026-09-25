@@ -139,6 +139,24 @@ commands → the compile and build ladder and every report; `generated` →
   change (`notifyOnPhaseChange`, default on) — the renderer now gates
   `window.pomodoro.notify(...)` behind it in `switchMode()`; the chime
   added earlier stays unconditional (a separate, later request).
+- Pin button restyled from an emoji to an inline SVG circle whose CSS
+  fill/stroke toggle with `aria-pressed` (hollow outline off, solid white
+  on) instead of a background-color highlight.
+- Start/pause button restyled from Korean text to an inline SVG play
+  triangle / pause bars, toggled via a `.running` class on the button.
+- Break mode now forces `--accent` to a fixed turquoise (`#40e0d0`)
+  regardless of the user's key-color setting; work mode still uses it.
+  `applyModeColor()` (renamed from `applyAccentColor()`) is called from
+  `switchMode()`, the accent-color picker, and init.
+- Pin-then-open-settings-then-close now restores the exact size the window
+  was pinned at (not the generic collapsed default): `setSizeLocked`
+  returns the current size, the renderer remembers it as `pinnedSize` while
+  locked, and the gear-close path prefers it. Along the way, found and
+  fixed a real bug reproduced in complete isolation (no app code): on this
+  platform, `BrowserWindow.setSize()` is unreliable while
+  `resizable: false`. Fixed by having the `window:resize` IPC handler
+  briefly unlock, resize, and relock around every programmatic resize —
+  the window is never user-draggable in between, since it's synchronous.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

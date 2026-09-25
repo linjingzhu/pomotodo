@@ -38,6 +38,9 @@
   let remainingSec = 25 * 60;
   let timerId = null;
   let running = false;
+  let userAccentColor = '#f2405a';
+  let pinnedSize = null; // set while the window size is locked; restored when settings close
+  const BREAK_ACCENT_COLOR = '#40e0d0'; // turquoise
 
   function fmt(sec) {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -48,15 +51,18 @@
   function render() {
     el.timerDisplay.textContent = fmt(remainingSec);
     el.modeLabel.textContent = mode === 'work' ? 'Pomodoro Timer' : '휴식';
-    el.startPauseBtn.textContent = running ? '일시정지' : '시작';
+    el.startPauseBtn.classList.toggle('running', running);
+    el.startPauseBtn.title = running ? '일시정지' : '시작';
     const remainingFraction = remainingSec / currentDurationSec();
     // Negative offset (vs. positive) is what makes the depleted portion grow
     // clockwise from 12 o'clock instead of counterclockwise.
     el.ringProgress.style.strokeDashoffset = String(-RING_CIRCUMFERENCE * (1 - remainingFraction));
   }
 
-  function applyAccentColor(color) {
-    document.documentElement.style.setProperty('--accent', color);
+  // Work mode uses the user's chosen key color; break mode is always
+  // turquoise, regardless of that setting.
+  function applyModeColor() {
+    document.documentElement.style.setProperty('--accent', mode === 'work' ? userAccentColor : BREAK_ACCENT_COLOR);
   }
 
   function applyBackgroundBlur(px) {
@@ -110,6 +116,7 @@
   function switchMode() {
     mode = mode === 'work' ? 'break' : 'work';
     remainingSec = currentDurationSec();
+    applyModeColor();
     const title = mode === 'work' ? '작업 시간' : '휴식 시간';
     const body = mode === 'work' ? '휴식이 끝났습니다. 작업을 시작하세요.' : '작업이 끝났습니다. 잠시 쉬세요.';
     if (el.notifyOnPhaseChange.checked) {
@@ -185,7 +192,11 @@
 
   el.pinBtn.addEventListener('click', async () => {
     const locked = el.pinBtn.getAttribute('aria-pressed') !== 'true';
-    setPinButtonState(await window.pomodoro.setSizeLocked(locked));
+    const result = await window.pomodoro.setSizeLocked(locked);
+    setPinButtonState(result.sizeLocked);
+    // Remember the size at the moment of pinning, so closing settings later
+    // (which always expands first) restores this instead of the default.
+    pinnedSize = result.sizeLocked ? { width: result.width, height: result.height } : null;
   });
 
   el.bgPickBtn.addEventListener('click', async () => {
@@ -217,7 +228,10 @@
     window.pomodoro.saveSettings({ backgroundTintOpacity: Number(el.bgTintOpacity.value) / 100 });
   });
 
-  el.accentColor.addEventListener('input', () => applyAccentColor(el.accentColor.value));
+  el.accentColor.addEventListener('input', () => {
+    userAccentColor = el.accentColor.value;
+    applyModeColor();
+  });
   el.accentColor.addEventListener('change', () => {
     window.pomodoro.saveSettings({ accentColor: el.accentColor.value });
   });
@@ -226,7 +240,9 @@
   el.gearBtn.addEventListener('click', async () => {
     panelOpen = !panelOpen;
     el.settingsPanel.classList.toggle('hidden', !panelOpen);
-    const size = panelOpen ? EXPANDED_SIZE : COLLAPSED_SIZE;
+    // Opening always expands to fit the panel; closing returns to whatever
+    // size was pinned, if any, rather than always the generic default.
+    const size = panelOpen ? EXPANDED_SIZE : (pinnedSize || COLLAPSED_SIZE);
     await window.pomodoro.resizeWindow(size.width, size.height);
   });
 
@@ -264,7 +280,8 @@
     el.bgTintColor.value = settings.backgroundTintColor;
     el.bgTintOpacity.value = Math.round(settings.backgroundTintOpacity * 100);
     el.accentColor.value = settings.accentColor;
-    applyAccentColor(settings.accentColor);
+    userAccentColor = settings.accentColor;
+    applyModeColor();
     applyBackgroundBlur(settings.backgroundBlur);
     applyBackgroundTint(settings.backgroundTintColor, Math.round(settings.backgroundTintOpacity * 100));
     if (background) setBackgroundImage(background.dataUrl);
