@@ -68,11 +68,8 @@ commands → the compile and build ladder and every report; `generated` →
 - `preload.js` — `contextBridge`-exposed `window.pomodoro` API; renderer runs
   with `contextIsolation: true`, `nodeIntegration: false`.
 - `renderer/` — UI: `index.html` (CSP-locked), `style.css`, `renderer.js`
-  (timer state machine, settings panel, corner-snap controls), `cosmos.js`
-  (a `<canvas>` background animation — stars, rotating rays and a spiral
-  particle field whose already-elapsed portion desaturates to grayscale as
-  the current work/break phase progresses; driven by `renderer.js` calling
-  `window.setCosmosProgress(fraction)` each tick). No framework; vanilla DOM.
+  (timer state machine, settings panel, corner-snap controls). No framework;
+  vanilla DOM.
 - `package.json` — `electron-builder` config targets `nsis` (installer) and
   `portable` for `win`/`x64`.
 - Build/run this repo can verify directly: `npm install`, syntax/lint of the
@@ -91,12 +88,6 @@ commands → the compile and build ladder and every report; `generated` →
 - Added close-to-tray (toggleable in settings, default off): when on, the
   window's own close (X) button hides to tray instead of quitting; quitting
   from the tray menu, or window-all-closed on non-mac, still quits for real.
-- Restyled onto a dark/pink-red palette (CSS custom properties), then added
-  a continuously-animated canvas background (`renderer/cosmos.js`): stars,
-  slowly rotating light rays, and a spiral particle field that reads as
-  gold for the remaining (future) portion of the current phase and fades
-  to grayscale for the already-elapsed (past) portion — the motion itself
-  never stops, independent of pause state.
 - Next: sound on phase change, as a separate slice, if requested.
 
 ## Permanently excluded scope
