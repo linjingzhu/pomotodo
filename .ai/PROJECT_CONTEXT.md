@@ -52,9 +52,10 @@ commands → the compile and build ladder and every report; `generated` →
   deliverable is a Windows installer (`electron-builder`, NSIS) plus a
   portable `.exe`; distribution target is Windows first.
 - Single-window Pomodoro timer: work/break countdown, always-on-top toggle,
-  fullscreen toggle, corner-snap to a chosen monitor, native OS notification
-  on phase change, system tray icon with minimize-to-tray, settings
-  persisted to disk between launches.
+  corner-snap to a chosen monitor, native OS notification plus a single
+  synthesized chime on phase change, system tray icon with minimize-to-tray,
+  settings persisted to disk between launches. Frameless window: no native
+  title bar, an in-app close button instead; no fullscreen.
 - No account system, no network calls, no telemetry, no ads. Fully offline.
 - Korean-language UI (target user is a Korean speaker); code, comments and
   commit messages stay in English per repository convention.
@@ -115,7 +116,16 @@ commands → the compile and build ladder and every report; `generated` →
   blurred, thin-bordered "glass" surfaces) so those controls read as
   floating over whatever background the user picks. Expanded settings
   panel height bumped 520 → 660 for the new rows.
-- Next: sound on phase change, as a separate slice, if requested.
+- Removed the fullscreen toggle entirely (button, IPC handler, and the
+  `isFullScreen()` guards in the resize/snap paths). Removed the native
+  window frame (`frame: false`, `fullscreenable: false`); the in-app
+  titlebar now carries its own close (✕) button next to the gear icon
+  (`window.close()` from the renderer, which still routes through the
+  existing close-to-tray logic). Corner-snap buttons dropped their text
+  labels down to arrow-only icons (with a `title` tooltip) and shrank.
+- Added a single synthesized chime (Web Audio API oscillator, no bundled
+  audio asset) alongside the existing native notification on phase change.
+- Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
 

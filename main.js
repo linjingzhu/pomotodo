@@ -70,7 +70,8 @@ function createWindow() {
     minHeight: 140,
     alwaysOnTop: settings.alwaysOnTop,
     resizable: true,
-    fullscreenable: true,
+    frame: false,
+    fullscreenable: false,
     icon: path.join(__dirname, 'renderer', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -79,17 +80,15 @@ function createWindow() {
     },
   });
 
-  mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   mainWindow.on('close', (event) => {
-    // persist current window size (only when not fullscreen) so next launch remembers it
-    if (!mainWindow.isFullScreen()) {
-      const [w, h] = mainWindow.getSize();
-      saveSettings({ windowWidth: w, windowHeight: h });
-    }
+    // persist current window size so next launch remembers it
+    const [w, h] = mainWindow.getSize();
+    saveSettings({ windowWidth: w, windowHeight: h });
     // A real quit (from the tray menu, or window-all-closed on non-mac) must
-    // go through; only an interactive close (the X button) can be redirected.
+    // go through; only an interactive close (the in-app close button) can be
+    // redirected.
     if (!app.isQuitting && loadSettings().closeToTray) {
       event.preventDefault();
       mainWindow.hide();
@@ -161,12 +160,6 @@ ipcMain.handle('window:setCloseToTray', (_evt, flag) => {
   return saveSettings({ closeToTray: !!flag }).closeToTray;
 });
 
-ipcMain.handle('window:toggleFullscreen', () => {
-  const next = !mainWindow.isFullScreen();
-  mainWindow.setFullScreen(next);
-  return next;
-});
-
 ipcMain.handle('window:getDisplays', () => {
   const displays = screen.getAllDisplays();
   const primaryId = screen.getPrimaryDisplay().id;
@@ -189,13 +182,11 @@ ipcMain.handle('window:snapToCorner', (_evt, { displayId, corner }) => {
   if (corner === 'tr' || corner === 'br') x = dx + dw - winW;
   if (corner === 'bl' || corner === 'br') y = dy + dh - winH;
 
-  if (mainWindow.isFullScreen()) mainWindow.setFullScreen(false);
   mainWindow.setBounds({ x: Math.round(x), y: Math.round(y), width: winW, height: winH });
   return { x, y };
 });
 
 ipcMain.handle('window:resize', (_evt, { width, height }) => {
-  if (mainWindow.isFullScreen()) return;
   mainWindow.setSize(Math.round(width), Math.round(height), true);
 });
 

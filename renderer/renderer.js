@@ -5,13 +5,13 @@
     startPauseBtn: document.getElementById('start-pause-btn'),
     resetBtn: document.getElementById('reset-btn'),
     gearBtn: document.getElementById('gear-btn'),
+    closeBtn: document.getElementById('close-btn'),
     settingsPanel: document.getElementById('settings-panel'),
     workMin: document.getElementById('work-min'),
     breakMin: document.getElementById('break-min'),
     alwaysTop: document.getElementById('always-top'),
     minimizeToTray: document.getElementById('minimize-to-tray'),
     closeToTray: document.getElementById('close-to-tray'),
-    fullscreenBtn: document.getElementById('fullscreen-btn'),
     displaySelect: document.getElementById('display-select'),
     cornerButtons: Array.from(document.querySelectorAll('#corner-grid button')),
     ringProgress: document.getElementById('ring-progress'),
@@ -48,7 +48,9 @@
     el.modeLabel.textContent = mode === 'work' ? '작업' : '휴식';
     el.startPauseBtn.textContent = running ? '일시정지' : '시작';
     const remainingFraction = remainingSec / currentDurationSec();
-    el.ringProgress.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - remainingFraction));
+    // Negative offset (vs. positive) is what makes the depleted portion grow
+    // clockwise from 12 o'clock instead of counterclockwise.
+    el.ringProgress.style.strokeDashoffset = String(-RING_CIRCUMFERENCE * (1 - remainingFraction));
   }
 
   function applyAccentColor(color) {
@@ -80,12 +82,36 @@
     render();
   }
 
+  // A single short chime, synthesized on the fly (no bundled audio asset,
+  // no autoplay-policy issues since it only ever fires after the user has
+  // already clicked "시작").
+  function playChime() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.25, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.5);
+      osc.onended = () => ctx.close();
+    } catch (e) {
+      // best effort; a missing/blocked AudioContext should never break the timer
+    }
+  }
+
   function switchMode() {
     mode = mode === 'work' ? 'break' : 'work';
     remainingSec = currentDurationSec();
     const title = mode === 'work' ? '작업 시간' : '휴식 시간';
     const body = mode === 'work' ? '휴식이 끝났습니다. 작업을 시작하세요.' : '작업이 끝났습니다. 잠시 쉬세요.';
     window.pomodoro.notify(title, body);
+    playChime();
   }
 
   function tick() {
@@ -141,8 +167,8 @@
     await window.pomodoro.setCloseToTray(el.closeToTray.checked);
   });
 
-  el.fullscreenBtn.addEventListener('click', async () => {
-    await window.pomodoro.toggleFullscreen();
+  el.closeBtn.addEventListener('click', () => {
+    window.close();
   });
 
   el.bgPickBtn.addEventListener('click', async () => {

@@ -6,7 +6,6 @@ contextBridge.exposeInMainWorld('pomodoro', {
   setAlwaysOnTop: (flag) => ipcRenderer.invoke('window:setAlwaysOnTop', flag),
   setMinimizeToTray: (flag) => ipcRenderer.invoke('window:setMinimizeToTray', flag),
   setCloseToTray: (flag) => ipcRenderer.invoke('window:setCloseToTray', flag),
-  toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
   getDisplays: () => ipcRenderer.invoke('window:getDisplays'),
   snapToCorner: (displayId, corner) => ipcRenderer.invoke('window:snapToCorner', { displayId, corner }),
   resizeWindow: (width, height) => ipcRenderer.invoke('window:resize', { width, height }),
