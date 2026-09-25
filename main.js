@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS = {
   backgroundTintColor: '#15161e',
   backgroundTintOpacity: 0,
   accentColor: '#f2405a',
-  windowWidth: 260,
+  windowWidth: 340,
   windowHeight: 250,
 };
 

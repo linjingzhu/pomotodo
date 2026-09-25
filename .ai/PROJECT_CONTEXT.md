@@ -125,6 +125,12 @@ commands → the compile and build ladder and every report; `generated` →
   labels down to arrow-only icons (with a `title` tooltip) and shrank.
 - Added a single synthesized chime (Web Audio API oscillator, no bundled
   audio asset) alongside the existing native notification on phase change.
+- Titlebar mode-label reads "Pomodoro Timer" during work mode (was "작업");
+  break mode unchanged ("휴식").
+- Widened the window (the ring and buttons read as cramped against the
+  glass card's edges at 260px): default/collapsed width 260 → 340,
+  expanded width 300 → 340 (now equal, so the window no longer narrows
+  when the settings panel opens). Glass-card padding 18px → 26px.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
