@@ -45,7 +45,7 @@
 
   function render() {
     el.timerDisplay.textContent = fmt(remainingSec);
-    el.modeLabel.textContent = mode === 'work' ? '작업' : '휴식';
+    el.modeLabel.textContent = mode === 'work' ? 'Pomodoro Timer' : '휴식';
     el.startPauseBtn.textContent = running ? '일시정지' : '시작';
     const remainingFraction = remainingSec / currentDurationSec();
     // Negative offset (vs. positive) is what makes the depleted portion grow
