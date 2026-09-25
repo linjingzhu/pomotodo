@@ -1,0 +1,20 @@
+# Terms that must not appear outside the files allowed to know what the
+# project is: .ai/PROJECT_CONTEXT.md, .ai/memory/PROJECT_LESSONS.md, and
+# anything under .ai/reports/.
+#
+# One term per line; `#` starts a comment. Matching is case-insensitive and on
+# whole words. This is a list of proper nouns, not of rules — a rule that can
+# only be expressed as a phrase to search for is not yet a rule
+# (LESSONS_FROM_PRACTICE.md entry 14).
+#
+# ADOPTING THIS SET: replace the seeds below with your own product name, your
+# organisation's name, and anything else that would make a policy document stop
+# being portable. An empty file makes the check vacuous, and it will say so.
+#
+# The seeds are the names removed when this set was separated from the project
+# that produced it. They are here so that separation cannot silently undo
+# itself, and they are the reason the check exists at all.
+
+Sunshine
+Marvelous
+Webium
