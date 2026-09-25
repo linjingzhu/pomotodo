@@ -15,6 +15,14 @@
     displaySelect: document.getElementById('display-select'),
     cornerButtons: Array.from(document.querySelectorAll('#corner-grid button')),
     ringProgress: document.getElementById('ring-progress'),
+    bgImage: document.getElementById('bg-image'),
+    bgTint: document.getElementById('bg-tint'),
+    bgPickBtn: document.getElementById('bg-pick-btn'),
+    bgClearBtn: document.getElementById('bg-clear-btn'),
+    bgBlur: document.getElementById('bg-blur'),
+    bgTintColor: document.getElementById('bg-tint-color'),
+    bgTintOpacity: document.getElementById('bg-tint-opacity'),
+    accentColor: document.getElementById('accent-color'),
   };
 
   const RING_RADIUS = 52;
@@ -22,7 +30,7 @@
   el.ringProgress.style.strokeDasharray = String(RING_CIRCUMFERENCE);
 
   const COLLAPSED_SIZE = { width: 260, height: 250 };
-  const EXPANDED_SIZE = { width: 300, height: 520 };
+  const EXPANDED_SIZE = { width: 300, height: 660 };
 
   let mode = 'work'; // 'work' | 'break'
   let remainingSec = 25 * 60;
@@ -41,6 +49,23 @@
     el.startPauseBtn.textContent = running ? '일시정지' : '시작';
     const remainingFraction = remainingSec / currentDurationSec();
     el.ringProgress.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - remainingFraction));
+  }
+
+  function applyAccentColor(color) {
+    document.documentElement.style.setProperty('--accent', color);
+  }
+
+  function applyBackgroundBlur(px) {
+    el.bgImage.style.filter = `blur(${px}px)`;
+  }
+
+  function applyBackgroundTint(color, opacityPercent) {
+    el.bgTint.style.background = color;
+    el.bgTint.style.opacity = String(opacityPercent / 100);
+  }
+
+  function setBackgroundImage(dataUrl) {
+    el.bgImage.style.backgroundImage = dataUrl ? `url(${dataUrl})` : 'none';
   }
 
   function currentDurationSec() {
@@ -120,6 +145,40 @@
     await window.pomodoro.toggleFullscreen();
   });
 
+  el.bgPickBtn.addEventListener('click', async () => {
+    const result = await window.pomodoro.pickBackgroundImage();
+    if (result) setBackgroundImage(result.dataUrl);
+  });
+
+  el.bgClearBtn.addEventListener('click', async () => {
+    await window.pomodoro.clearBackgroundImage();
+    setBackgroundImage(null);
+  });
+
+  el.bgBlur.addEventListener('input', () => applyBackgroundBlur(Number(el.bgBlur.value)));
+  el.bgBlur.addEventListener('change', () => {
+    window.pomodoro.saveSettings({ backgroundBlur: Number(el.bgBlur.value) });
+  });
+
+  el.bgTintColor.addEventListener('input', () => {
+    applyBackgroundTint(el.bgTintColor.value, Number(el.bgTintOpacity.value));
+  });
+  el.bgTintColor.addEventListener('change', () => {
+    window.pomodoro.saveSettings({ backgroundTintColor: el.bgTintColor.value });
+  });
+
+  el.bgTintOpacity.addEventListener('input', () => {
+    applyBackgroundTint(el.bgTintColor.value, Number(el.bgTintOpacity.value));
+  });
+  el.bgTintOpacity.addEventListener('change', () => {
+    window.pomodoro.saveSettings({ backgroundTintOpacity: Number(el.bgTintOpacity.value) / 100 });
+  });
+
+  el.accentColor.addEventListener('input', () => applyAccentColor(el.accentColor.value));
+  el.accentColor.addEventListener('change', () => {
+    window.pomodoro.saveSettings({ accentColor: el.accentColor.value });
+  });
+
   let panelOpen = false;
   el.gearBtn.addEventListener('click', async () => {
     panelOpen = !panelOpen;
@@ -147,12 +206,23 @@
   }
 
   async function init() {
-    const settings = await window.pomodoro.getSettings();
+    const [settings, background] = await Promise.all([
+      window.pomodoro.getSettings(),
+      window.pomodoro.getBackgroundImage(),
+    ]);
     el.workMin.value = settings.workMinutes;
     el.breakMin.value = settings.breakMinutes;
     el.alwaysTop.checked = settings.alwaysOnTop;
     el.minimizeToTray.checked = settings.minimizeToTray;
     el.closeToTray.checked = settings.closeToTray;
+    el.bgBlur.value = settings.backgroundBlur;
+    el.bgTintColor.value = settings.backgroundTintColor;
+    el.bgTintOpacity.value = Math.round(settings.backgroundTintOpacity * 100);
+    el.accentColor.value = settings.accentColor;
+    applyAccentColor(settings.accentColor);
+    applyBackgroundBlur(settings.backgroundBlur);
+    applyBackgroundTint(settings.backgroundTintColor, Math.round(settings.backgroundTintOpacity * 100));
+    if (background) setBackgroundImage(background.dataUrl);
     remainingSec = settings.workMinutes * 60;
     render();
     await populateDisplays();

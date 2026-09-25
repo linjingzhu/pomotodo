@@ -68,14 +68,26 @@ commands → the compile and build ladder and every report; `generated` →
 - `preload.js` — `contextBridge`-exposed `window.pomodoro` API; renderer runs
   with `contextIsolation: true`, `nodeIntegration: false`.
 - `renderer/` — UI: `index.html` (CSP-locked), `style.css`, `renderer.js`
-  (timer state machine, settings panel, corner-snap controls, and an SVG
-  ring around the timer digits whose `stroke-dashoffset` tracks the
-  remaining-time fraction each tick). No framework; vanilla DOM.
+  (timer state machine, settings panel, corner-snap controls, an SVG ring
+  around the timer digits whose `stroke-dashoffset` tracks the
+  remaining-time fraction each tick, and background image/blur/tint +
+  accent-color controls). No framework; vanilla DOM.
+- Background image handling: `main.js` stores only the picked file's path
+  in settings; `imageFileToDataUrl()` re-reads and base64-encodes it into a
+  `data:` URL on demand (`background:pick`/`background:get` IPC), so
+  `settings.json` stays small. The renderer applies it via
+  `background-size: cover` (fills on the short side, crops the long side)
+  behind a separate tint overlay div, both behind a set of translucent
+  `backdrop-filter: blur()` "glass" surfaces (titlebar, timer card,
+  settings panel) — the glassmorphism look the user asked for. The accent
+  color is a single CSS custom property (`--accent`) the user repoints live.
 - `package.json` — `electron-builder` config targets `nsis` (installer) and
   `portable` for `win`/`x64`.
 - Build/run this repo can verify directly: `npm install`, syntax/lint of the
-  JS. Producing and running the actual Windows `.exe` requires Windows (or
-  Wine) and is out of reach of this Linux container — see
+  JS, and screenshots captured via `webContents.capturePage()` under Xvfb
+  (see the recent commits for what that caught). Producing and running the
+  actual Windows `.exe` requires Windows (or Wine) and is out of reach of
+  this Linux container — see
   `docs/OWNER_ACTIONS.md`.
 
 ## Current development slice
@@ -95,6 +107,14 @@ commands → the compile and build ladder and every report; `generated` →
   progress ring around the timer digits instead (remaining-time fraction as
   a depleting accent-colored arc on a muted track). Collapsed window height
   bumped 200 → 250 to fit the ring.
+- Added a user-selectable background image (cover-fit, short side fills the
+  window), background blur and tint (color + strength), and a
+  user-selectable accent/key color for the ring and buttons — settings
+  persist and re-apply on the next launch. Restyled the titlebar, the timer
+  card and the settings panel onto a glassmorphism look (translucent,
+  blurred, thin-bordered "glass" surfaces) so those controls read as
+  floating over whatever background the user picks. Expanded settings
+  panel height bumped 520 → 660 for the new rows.
 - Next: sound on phase change, as a separate slice, if requested.
 
 ## Permanently excluded scope

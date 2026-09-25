@@ -4,10 +4,17 @@
   --bg: #15161e;
   --bg-panel: #1a1b24;
   --accent: #f2405a;
-  --accent-hover: #ff5a72;
   --border: #2b2c38;
   --text: #f5f5f7;
   --text-muted: #8b8d9c;
+
+  /* Glassmorphism: a translucent, blurred, thin-bordered surface that lets
+     the background image/tint show through instead of an opaque panel. */
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-bg-strong: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-blur: 16px;
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
 html, body {
@@ -21,10 +28,37 @@ html, body {
   overflow: hidden;
 }
 
+/* Background image (short side fills the window, long side crops) plus an
+   independent tint overlay; both sit behind #app, which stays transparent
+   so either shows through the glass surfaces above them. Inset is larger
+   than the max blur radius so the blur filter never reveals a transparent
+   edge. */
+#bg-image {
+  position: fixed;
+  inset: -40px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#bg-tint {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
 #app {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   height: 100vh;
+  background: transparent;
 }
 
 #titlebar {
@@ -32,7 +66,10 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  background: var(--bg);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--glass-border);
   -webkit-app-region: drag;
   font-size: 12px;
   font-weight: 700;
@@ -49,7 +86,7 @@ html, body {
   padding: 2px 6px;
   border-radius: 4px;
 }
-#gear-btn:hover { background: var(--bg-panel); color: var(--text); }
+#gear-btn:hover { background: var(--glass-bg-strong); color: var(--text); }
 
 main {
   flex: 1;
@@ -57,8 +94,22 @@ main {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   padding: 8px;
+  background: transparent;
+}
+
+.glass-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 #timer-ring {
@@ -80,7 +131,7 @@ main {
 
 .ring-track {
   fill: none;
-  stroke: var(--border);
+  stroke: rgba(255, 255, 255, 0.14);
   stroke-width: 8;
 }
 
@@ -101,6 +152,7 @@ main {
   letter-spacing: 1px;
   font-variant-numeric: tabular-nums;
   color: var(--text);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
 }
 
 #controls {
@@ -112,25 +164,30 @@ button {
   font-family: inherit;
   font-size: 13px;
   padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-panel);
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
   color: var(--text);
   cursor: pointer;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
-button:hover { background: #23242f; }
+button:hover { background: rgba(255, 255, 255, 0.16); }
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: white;
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
-button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+button.primary:hover { filter: brightness(1.12); }
 
 #settings-panel {
   padding: 10px 12px 14px;
-  background: var(--bg-panel);
-  border-top: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-top: 1px solid var(--glass-border);
   font-size: 12px;
   display: flex;
   flex-direction: column;
@@ -138,6 +195,11 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
   overflow-y: auto;
 }
 #settings-panel.hidden { display: none; }
+
+.button-group {
+  display: flex;
+  gap: 6px;
+}
 
 .row {
   display: flex;
@@ -153,8 +215,8 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
 
 input[type="number"] {
   width: 60px;
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
   color: var(--text);
   border-radius: 4px;
   padding: 3px 6px;
@@ -167,9 +229,24 @@ input[type="checkbox"] {
   accent-color: var(--accent);
 }
 
+input[type="range"] {
+  width: 100px;
+  accent-color: var(--accent);
+}
+
+input[type="color"] {
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
 hr {
   border: none;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   margin: 2px 0;
 }
 
@@ -182,8 +259,8 @@ hr {
 #corner-grid button { font-size: 11px; padding: 6px 4px; }
 
 select {
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
   color: var(--text);
   border-radius: 4px;
   padding: 3px 6px;

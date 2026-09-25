@@ -11,4 +11,7 @@ contextBridge.exposeInMainWorld('pomodoro', {
   snapToCorner: (displayId, corner) => ipcRenderer.invoke('window:snapToCorner', { displayId, corner }),
   resizeWindow: (width, height) => ipcRenderer.invoke('window:resize', { width, height }),
   notify: (title, body) => ipcRenderer.invoke('notify', { title, body }),
+  pickBackgroundImage: () => ipcRenderer.invoke('background:pick'),
+  clearBackgroundImage: () => ipcRenderer.invoke('background:clear'),
+  getBackgroundImage: () => ipcRenderer.invoke('background:get'),
 });

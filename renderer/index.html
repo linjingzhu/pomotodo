@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="bg-image"></div>
+  <div id="bg-tint"></div>
   <div id="app">
     <header id="titlebar">
       <span id="mode-label">작업</span>
@@ -14,16 +16,18 @@
     </header>
 
     <main>
-      <div id="timer-ring">
-        <svg viewBox="0 0 120 120">
-          <circle class="ring-track" cx="60" cy="60" r="52" />
-          <circle id="ring-progress" cx="60" cy="60" r="52" />
-        </svg>
-        <div id="timer-display">25:00</div>
-      </div>
-      <div id="controls">
-        <button id="start-pause-btn" class="primary">시작</button>
-        <button id="reset-btn">초기화</button>
+      <div class="glass-card">
+        <div id="timer-ring">
+          <svg viewBox="0 0 120 120">
+            <circle class="ring-track" cx="60" cy="60" r="52" />
+            <circle id="ring-progress" cx="60" cy="60" r="52" />
+          </svg>
+          <div id="timer-display">25:00</div>
+        </div>
+        <div id="controls">
+          <button id="start-pause-btn" class="primary">시작</button>
+          <button id="reset-btn">초기화</button>
+        </div>
       </div>
     </main>
 
@@ -65,6 +69,31 @@
           <button data-corner="bl">↙ 좌하단</button>
           <button data-corner="br">↘ 우하단</button>
         </div>
+      </div>
+      <hr />
+      <div class="row">
+        <label>배경 이미지 (짧은 쪽에 맞춰 채움)</label>
+        <div class="button-group">
+          <button id="bg-pick-btn">선택...</button>
+          <button id="bg-clear-btn">지우기</button>
+        </div>
+      </div>
+      <div class="row">
+        <label for="bg-blur">배경 블러</label>
+        <input type="range" id="bg-blur" min="0" max="20" step="1" />
+      </div>
+      <div class="row">
+        <label for="bg-tint-color">배경 틴트 색상</label>
+        <input type="color" id="bg-tint-color" />
+      </div>
+      <div class="row">
+        <label for="bg-tint-opacity">틴트 강도</label>
+        <input type="range" id="bg-tint-opacity" min="0" max="100" step="5" />
+      </div>
+      <hr />
+      <div class="row">
+        <label for="accent-color">키 컬러 (링 · 버튼)</label>
+        <input type="color" id="accent-color" />
       </div>
     </section>
   </div>

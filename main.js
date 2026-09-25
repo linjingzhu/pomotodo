@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, Notification, nativeImage, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -10,9 +10,32 @@ const DEFAULT_SETTINGS = {
   alwaysOnTop: false,
   minimizeToTray: true,
   closeToTray: false,
+  backgroundImagePath: null,
+  backgroundBlur: 0,
+  backgroundTintColor: '#15161e',
+  backgroundTintOpacity: 0,
+  accentColor: '#f2405a',
   windowWidth: 260,
   windowHeight: 250,
 };
+
+const IMAGE_MIME_TYPES = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+};
+
+// Settings only ever store the file path; the data URL is rebuilt on demand
+// so settings.json stays small and always reflects the file's current bytes.
+function imageFileToDataUrl(filePath) {
+  const mime = IMAGE_MIME_TYPES[path.extname(filePath).toLowerCase()];
+  if (!mime) return null;
+  const buffer = fs.readFileSync(filePath);
+  return `data:${mime};base64,${buffer.toString('base64')}`;
+}
 
 function loadSettings() {
   try {
@@ -179,6 +202,39 @@ ipcMain.handle('window:resize', (_evt, { width, height }) => {
 ipcMain.handle('notify', (_evt, { title, body }) => {
   if (Notification.isSupported()) {
     new Notification({ title, body }).show();
+  }
+});
+
+ipcMain.handle('background:pick', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '배경 이미지 선택',
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const filePath = result.filePaths[0];
+  try {
+    const dataUrl = imageFileToDataUrl(filePath);
+    if (!dataUrl) return null;
+    saveSettings({ backgroundImagePath: filePath });
+    return { dataUrl };
+  } catch (e) {
+    return null;
+  }
+});
+
+ipcMain.handle('background:clear', () => {
+  saveSettings({ backgroundImagePath: null });
+});
+
+ipcMain.handle('background:get', () => {
+  const { backgroundImagePath } = loadSettings();
+  if (!backgroundImagePath) return null;
+  try {
+    const dataUrl = imageFileToDataUrl(backgroundImagePath);
+    return dataUrl ? { dataUrl } : null;
+  } catch (e) {
+    return null;
   }
 });
 
