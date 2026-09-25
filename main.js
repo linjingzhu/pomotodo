@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = {
   minimizeToTray: true,
   closeToTray: false,
   windowWidth: 260,
-  windowHeight: 200,
+  windowHeight: 250,
 };
 
 function loadSettings() {

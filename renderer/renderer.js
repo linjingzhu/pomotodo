@@ -14,9 +14,14 @@
     fullscreenBtn: document.getElementById('fullscreen-btn'),
     displaySelect: document.getElementById('display-select'),
     cornerButtons: Array.from(document.querySelectorAll('#corner-grid button')),
+    ringProgress: document.getElementById('ring-progress'),
   };
 
-  const COLLAPSED_SIZE = { width: 260, height: 200 };
+  const RING_RADIUS = 52;
+  const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+  el.ringProgress.style.strokeDasharray = String(RING_CIRCUMFERENCE);
+
+  const COLLAPSED_SIZE = { width: 260, height: 250 };
   const EXPANDED_SIZE = { width: 300, height: 520 };
 
   let mode = 'work'; // 'work' | 'break'
@@ -34,6 +39,8 @@
     el.timerDisplay.textContent = fmt(remainingSec);
     el.modeLabel.textContent = mode === 'work' ? '작업' : '휴식';
     el.startPauseBtn.textContent = running ? '일시정지' : '시작';
+    const remainingFraction = remainingSec / currentDurationSec();
+    el.ringProgress.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - remainingFraction));
   }
 
   function currentDurationSec() {
