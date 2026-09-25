@@ -9,13 +9,14 @@
     workMin: document.getElementById('work-min'),
     breakMin: document.getElementById('break-min'),
     alwaysTop: document.getElementById('always-top'),
+    minimizeToTray: document.getElementById('minimize-to-tray'),
     fullscreenBtn: document.getElementById('fullscreen-btn'),
     displaySelect: document.getElementById('display-select'),
     cornerButtons: Array.from(document.querySelectorAll('#corner-grid button')),
   };
 
   const COLLAPSED_SIZE = { width: 260, height: 200 };
-  const EXPANDED_SIZE = { width: 300, height: 460 };
+  const EXPANDED_SIZE = { width: 300, height: 490 };
 
   let mode = 'work'; // 'work' | 'break'
   let remainingSec = 25 * 60;
@@ -99,6 +100,10 @@
     await window.pomodoro.setAlwaysOnTop(el.alwaysTop.checked);
   });
 
+  el.minimizeToTray.addEventListener('change', async () => {
+    await window.pomodoro.setMinimizeToTray(el.minimizeToTray.checked);
+  });
+
   el.fullscreenBtn.addEventListener('click', async () => {
     await window.pomodoro.toggleFullscreen();
   });
@@ -134,6 +139,7 @@
     el.workMin.value = settings.workMinutes;
     el.breakMin.value = settings.breakMinutes;
     el.alwaysTop.checked = settings.alwaysOnTop;
+    el.minimizeToTray.checked = settings.minimizeToTray;
     remainingSec = settings.workMinutes * 60;
     render();
     await populateDisplays();

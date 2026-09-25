@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, Notification, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -8,6 +8,7 @@ const DEFAULT_SETTINGS = {
   workMinutes: 25,
   breakMinutes: 5,
   alwaysOnTop: false,
+  minimizeToTray: true,
   windowWidth: 260,
   windowHeight: 200,
 };
@@ -64,6 +65,50 @@ function createWindow() {
       saveSettings({ windowWidth: w, windowHeight: h });
     }
   });
+
+  // Minimizing hides to the tray instead of the taskbar, when enabled; the
+  // tray icon is the only way back in, so the window must never be lost.
+  mainWindow.on('minimize', (event) => {
+    if (loadSettings().minimizeToTray) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+}
+
+function showWindow() {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function toggleWindow() {
+  if (!mainWindow) return;
+  if (mainWindow.isVisible()) mainWindow.hide();
+  else showWindow();
+}
+
+function createTray() {
+  const icon = nativeImage
+    .createFromPath(path.join(__dirname, 'renderer', 'icon.png'))
+    .resize({ width: 16, height: 16 });
+  tray = new Tray(icon);
+  tray.setToolTip('Pomodoro Timer');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '열기', click: showWindow },
+      { type: 'separator' },
+      {
+        label: '종료',
+        click: () => {
+          app.isQuitting = true;
+          app.quit();
+        },
+      },
+    ])
+  );
+  tray.on('click', toggleWindow);
 }
 
 // ---- IPC handlers used by the renderer (UI) ----
@@ -76,6 +121,10 @@ ipcMain.handle('window:setAlwaysOnTop', (_evt, flag) => {
   mainWindow.setAlwaysOnTop(!!flag);
   saveSettings({ alwaysOnTop: !!flag });
   return mainWindow.isAlwaysOnTop();
+});
+
+ipcMain.handle('window:setMinimizeToTray', (_evt, flag) => {
+  return saveSettings({ minimizeToTray: !!flag }).minimizeToTray;
 });
 
 ipcMain.handle('window:toggleFullscreen', () => {
@@ -124,10 +173,15 @@ ipcMain.handle('notify', (_evt, { title, body }) => {
 
 app.whenReady().then(() => {
   createWindow();
+  createTray();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
 });
 
 app.on('window-all-closed', () => {

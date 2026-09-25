@@ -53,7 +53,8 @@ commands → the compile and build ladder and every report; `generated` →
   portable `.exe`; distribution target is Windows first.
 - Single-window Pomodoro timer: work/break countdown, always-on-top toggle,
   fullscreen toggle, corner-snap to a chosen monitor, native OS notification
-  on phase change, settings persisted to disk between launches.
+  on phase change, system tray icon with minimize-to-tray, settings
+  persisted to disk between launches.
 - No account system, no network calls, no telemetry, no ads. Fully offline.
 - Korean-language UI (target user is a Korean speaker); code, comments and
   commit messages stay in English per repository convention.
@@ -78,12 +79,13 @@ commands → the compile and build ladder and every report; `generated` →
 
 ## Current development slice
 
-- Bringing the Electron prototype (window, timer, settings persistence,
+- Brought the Electron prototype (window, timer, settings persistence,
   monitor snapping, notifications) from a prior working session into this
   repository as the project's actual source, under version control.
-- Next: verify the app starts headlessly where possible in CI/dev
-  containers (Xvfb), then iterate on remaining UX polish (tray icon,
-  minimize-to-tray, sound on phase change) as separate slices.
+- Added a system tray icon and minimize-to-tray (toggleable in settings,
+  default on): minimizing hides the window instead of dropping to the
+  taskbar; the tray icon shows/hides it and offers a real quit.
+- Next: sound on phase change, as a separate slice, if requested.
 
 ## Permanently excluded scope
 
