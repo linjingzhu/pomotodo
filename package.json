@@ -1,0 +1,48 @@
+{
+  "name": "pomodoro-timer",
+  "version": "1.0.0",
+  "description": "설치형 Windows 뽀모도로 타이머",
+  "main": "main.js",
+  "author": "Daniel Sword",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.danielsword.pomodorotimer",
+    "productName": "Pomodoro Timer",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "PomodoroTimer-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "PomodoroTimer-Portable-${version}.${ext}"
+    }
+  }
+}
