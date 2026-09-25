@@ -10,6 +10,8 @@ const DEFAULT_SETTINGS = {
   alwaysOnTop: false,
   minimizeToTray: true,
   closeToTray: false,
+  sizeLocked: false,
+  notifyOnPhaseChange: true,
   backgroundImagePath: null,
   backgroundBlur: 0,
   backgroundTintColor: '#15161e',
@@ -69,7 +71,7 @@ function createWindow() {
     minWidth: 180,
     minHeight: 140,
     alwaysOnTop: settings.alwaysOnTop,
-    resizable: true,
+    resizable: !settings.sizeLocked,
     frame: false,
     fullscreenable: false,
     icon: path.join(__dirname, 'renderer', 'icon.png'),
@@ -150,6 +152,11 @@ ipcMain.handle('window:setAlwaysOnTop', (_evt, flag) => {
   mainWindow.setAlwaysOnTop(!!flag);
   saveSettings({ alwaysOnTop: !!flag });
   return mainWindow.isAlwaysOnTop();
+});
+
+ipcMain.handle('window:setSizeLocked', (_evt, flag) => {
+  mainWindow.setResizable(!flag);
+  return saveSettings({ sizeLocked: !!flag }).sizeLocked;
 });
 
 ipcMain.handle('window:setMinimizeToTray', (_evt, flag) => {

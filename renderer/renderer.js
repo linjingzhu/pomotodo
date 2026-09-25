@@ -4,11 +4,13 @@
     timerDisplay: document.getElementById('timer-display'),
     startPauseBtn: document.getElementById('start-pause-btn'),
     resetBtn: document.getElementById('reset-btn'),
+    pinBtn: document.getElementById('pin-btn'),
     gearBtn: document.getElementById('gear-btn'),
     closeBtn: document.getElementById('close-btn'),
     settingsPanel: document.getElementById('settings-panel'),
     workMin: document.getElementById('work-min'),
     breakMin: document.getElementById('break-min'),
+    notifyOnPhaseChange: document.getElementById('notify-on-phase-change'),
     alwaysTop: document.getElementById('always-top'),
     minimizeToTray: document.getElementById('minimize-to-tray'),
     closeToTray: document.getElementById('close-to-tray'),
@@ -30,7 +32,7 @@
   el.ringProgress.style.strokeDasharray = String(RING_CIRCUMFERENCE);
 
   const COLLAPSED_SIZE = { width: 340, height: 250 };
-  const EXPANDED_SIZE = { width: 340, height: 660 };
+  const EXPANDED_SIZE = { width: 340, height: 690 };
 
   let mode = 'work'; // 'work' | 'break'
   let remainingSec = 25 * 60;
@@ -110,7 +112,9 @@
     remainingSec = currentDurationSec();
     const title = mode === 'work' ? '작업 시간' : '휴식 시간';
     const body = mode === 'work' ? '휴식이 끝났습니다. 작업을 시작하세요.' : '작업이 끝났습니다. 잠시 쉬세요.';
-    window.pomodoro.notify(title, body);
+    if (el.notifyOnPhaseChange.checked) {
+      window.pomodoro.notify(title, body);
+    }
     playChime();
   }
 
@@ -155,6 +159,10 @@
     if (!running && mode === 'break') resetTimer();
   });
 
+  el.notifyOnPhaseChange.addEventListener('change', () => {
+    window.pomodoro.saveSettings({ notifyOnPhaseChange: el.notifyOnPhaseChange.checked });
+  });
+
   el.alwaysTop.addEventListener('change', async () => {
     await window.pomodoro.setAlwaysOnTop(el.alwaysTop.checked);
   });
@@ -169,6 +177,15 @@
 
   el.closeBtn.addEventListener('click', () => {
     window.close();
+  });
+
+  function setPinButtonState(locked) {
+    el.pinBtn.setAttribute('aria-pressed', String(locked));
+  }
+
+  el.pinBtn.addEventListener('click', async () => {
+    const locked = el.pinBtn.getAttribute('aria-pressed') !== 'true';
+    setPinButtonState(await window.pomodoro.setSizeLocked(locked));
   });
 
   el.bgPickBtn.addEventListener('click', async () => {
@@ -238,7 +255,9 @@
     ]);
     el.workMin.value = settings.workMinutes;
     el.breakMin.value = settings.breakMinutes;
+    el.notifyOnPhaseChange.checked = settings.notifyOnPhaseChange;
     el.alwaysTop.checked = settings.alwaysOnTop;
+    setPinButtonState(settings.sizeLocked);
     el.minimizeToTray.checked = settings.minimizeToTray;
     el.closeToTray.checked = settings.closeToTray;
     el.bgBlur.value = settings.backgroundBlur;

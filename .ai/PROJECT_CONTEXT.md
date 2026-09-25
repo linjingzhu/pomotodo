@@ -131,6 +131,14 @@ commands → the compile and build ladder and every report; `generated` →
   glass card's edges at 260px): default/collapsed width 260 → 340,
   expanded width 300 → 340 (now equal, so the window no longer narrows
   when the settings panel opens). Glass-card padding 18px → 26px.
+- Added a pin-toggle button (`#pin-btn`, 📌) in the titlebar, left of the
+  gear icon: `window:setSizeLocked` IPC calls `mainWindow.setResizable()`
+  and persists `sizeLocked`; the button's `aria-pressed` attribute drives
+  both its accent-colored active styling and its state on load.
+- Added a settings toggle for the native Windows notification on phase
+  change (`notifyOnPhaseChange`, default on) — the renderer now gates
+  `window.pomodoro.notify(...)` behind it in `switchMode()`; the chime
+  added earlier stays unconditional (a separate, later request).
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
