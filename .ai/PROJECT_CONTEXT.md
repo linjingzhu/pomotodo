@@ -85,6 +85,9 @@ commands → the compile and build ladder and every report; `generated` →
 - Added a system tray icon and minimize-to-tray (toggleable in settings,
   default on): minimizing hides the window instead of dropping to the
   taskbar; the tray icon shows/hides it and offers a real quit.
+- Added close-to-tray (toggleable in settings, default off): when on, the
+  window's own close (X) button hides to tray instead of quitting; quitting
+  from the tray menu, or window-all-closed on non-mac, still quits for real.
 - Next: sound on phase change, as a separate slice, if requested.
 
 ## Permanently excluded scope

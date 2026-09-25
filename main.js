@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS = {
   breakMinutes: 5,
   alwaysOnTop: false,
   minimizeToTray: true,
+  closeToTray: false,
   windowWidth: 260,
   windowHeight: 200,
 };
@@ -58,11 +59,17 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  mainWindow.on('close', () => {
+  mainWindow.on('close', (event) => {
     // persist current window size (only when not fullscreen) so next launch remembers it
     if (!mainWindow.isFullScreen()) {
       const [w, h] = mainWindow.getSize();
       saveSettings({ windowWidth: w, windowHeight: h });
+    }
+    // A real quit (from the tray menu, or window-all-closed on non-mac) must
+    // go through; only an interactive close (the X button) can be redirected.
+    if (!app.isQuitting && loadSettings().closeToTray) {
+      event.preventDefault();
+      mainWindow.hide();
     }
   });
 
@@ -125,6 +132,10 @@ ipcMain.handle('window:setAlwaysOnTop', (_evt, flag) => {
 
 ipcMain.handle('window:setMinimizeToTray', (_evt, flag) => {
   return saveSettings({ minimizeToTray: !!flag }).minimizeToTray;
+});
+
+ipcMain.handle('window:setCloseToTray', (_evt, flag) => {
+  return saveSettings({ closeToTray: !!flag }).closeToTray;
 });
 
 ipcMain.handle('window:toggleFullscreen', () => {
