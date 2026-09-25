@@ -34,6 +34,9 @@
     el.timerDisplay.textContent = fmt(remainingSec);
     el.modeLabel.textContent = mode === 'work' ? '작업' : '휴식';
     el.startPauseBtn.textContent = running ? '일시정지' : '시작';
+    if (window.setCosmosProgress) {
+      window.setCosmosProgress(1 - remainingSec / currentDurationSec());
+    }
   }
 
   function currentDurationSec() {
