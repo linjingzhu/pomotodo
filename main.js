@@ -17,7 +17,8 @@ const DEFAULT_SETTINGS = {
   closeToTray: false,
   sizeLocked: false,
   notifyOnPhaseChange: true,
-  backgroundImagePath: null,
+  backgroundImageFile: null, // the app's own copy, in the userData folder
+  backgroundImagePath: null, // before 1.0.8: the original file's path
   backgroundBlur: 0,
   backgroundTintColor: '#15161e',
   backgroundTintOpacity: 0,
@@ -39,8 +40,8 @@ const IMAGE_MIME_TYPES = {
   '.bmp': 'image/bmp',
 };
 
-// Settings only ever store the file path; the data URL is rebuilt on demand
-// so settings.json stays small and always reflects the file's current bytes.
+// Settings only ever store a file name; the data URL is rebuilt on demand
+// so settings.json stays small.
 function imageFileToDataUrl(filePath) {
   const mime = IMAGE_MIME_TYPES[path.extname(filePath).toLowerCase()];
   if (!mime) return null;
@@ -551,6 +552,36 @@ ipcMain.handle('notify', (_evt, { title, body }) => {
 
 ipcMain.handle('notify:close', () => closePhaseNotification());
 
+// The background image is copied into the app's own folder (next to
+// settings.json) as background.<ext>, so moving or deleting the original
+// doesn't lose it. One copy at a time: picking another replaces it, and
+// Clear deletes it.
+function removeStoredBackgrounds(keep) {
+  for (const ext of Object.keys(IMAGE_MIME_TYPES)) {
+    const name = `background${ext}`;
+    if (name === keep) continue;
+    try {
+      fs.unlinkSync(path.join(app.getPath('userData'), name));
+    } catch (e) {
+      // not there
+    }
+  }
+}
+
+function storeBackgroundImage(sourcePath) {
+  const ext = path.extname(sourcePath).toLowerCase();
+  if (!IMAGE_MIME_TYPES[ext]) return null;
+  const dir = app.getPath('userData');
+  fs.mkdirSync(dir, { recursive: true });
+  const name = `background${ext}`;
+  const tmp = path.join(dir, `${name}.tmp`);
+  fs.copyFileSync(sourcePath, tmp); // copied aside, then swapped in
+  removeStoredBackgrounds(name);
+  fs.renameSync(tmp, path.join(dir, name));
+  saveSettings({ backgroundImageFile: name, backgroundImagePath: null });
+  return name;
+}
+
 ipcMain.handle('background:pick', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Choose background image',
@@ -558,11 +589,10 @@ ipcMain.handle('background:pick', async () => {
     filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
   });
   if (result.canceled || !result.filePaths[0]) return null;
-  const filePath = result.filePaths[0];
   try {
-    const dataUrl = imageFileToDataUrl(filePath);
+    const dataUrl = imageFileToDataUrl(result.filePaths[0]);
     if (!dataUrl) return null;
-    saveSettings({ backgroundImagePath: filePath });
+    storeBackgroundImage(result.filePaths[0]);
     return { dataUrl };
   } catch (e) {
     return null;
@@ -570,14 +600,24 @@ ipcMain.handle('background:pick', async () => {
 });
 
 ipcMain.handle('background:clear', () => {
-  saveSettings({ backgroundImagePath: null });
+  removeStoredBackgrounds(null);
+  saveSettings({ backgroundImageFile: null, backgroundImagePath: null });
 });
 
 ipcMain.handle('background:get', () => {
-  const { backgroundImagePath } = loadSettings();
-  if (!backgroundImagePath) return null;
+  let { backgroundImageFile: name, backgroundImagePath: original } = loadSettings();
+  // Before 1.0.8 only the original's path was kept: take a copy now, while
+  // it's still there (if it's gone, the setting is left for a later try).
+  if (!name && original) {
+    try {
+      name = storeBackgroundImage(original);
+    } catch (e) {
+      return null;
+    }
+  }
+  if (!name) return null;
   try {
-    const dataUrl = imageFileToDataUrl(backgroundImagePath);
+    const dataUrl = imageFileToDataUrl(path.join(app.getPath('userData'), path.basename(name)));
     return dataUrl ? { dataUrl } : null;
   } catch (e) {
     return null;

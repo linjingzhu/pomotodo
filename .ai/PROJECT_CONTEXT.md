@@ -589,6 +589,13 @@ commands → the compile and build ladder and every report; `generated` →
     window.
   - Lesson: a Windows-only path that can't be exercised here is a bet.
     Prefer designs whose behavior is testable in the page.
+  - Also in 1.0.8, per the user: the background image is copied into
+    userData as `background.<ext>` (`backgroundImageFile`; temp copy,
+    then rename; other `background.*` removed). Moving or deleting the
+    original no longer loses it, and Clear deletes the copy. The old
+    `backgroundImagePath` is migrated on the first `background:get`
+    while the original still exists; if it's gone, the setting is left
+    alone.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
