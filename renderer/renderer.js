@@ -2,6 +2,8 @@
   const el = {
     app: document.getElementById('app'),
     taskInput: document.getElementById('task-input'),
+    goalField: document.getElementById('goal-field'),
+    goalCheck: document.getElementById('goal-check'),
     totalTurns: document.getElementById('total-turns'),
     totalStudy: document.getElementById('total-study'),
     statsResetBtn: document.getElementById('stats-reset-btn'),
@@ -36,9 +38,21 @@
 
 
   let mode = 'work'; // 'work' | 'break'
-  let remainingSec = 25 * 60;
+  // Time is kept by the wall clock, not by counting ticks: a hidden or
+  // minimized window's timers can be throttled to one wake-up a minute,
+  // which made a tick-counting timer all but stop in the tray. Ticks only
+  // sample the clock.
+  let remainingMs = 25 * 60 * 1000;
+  let phaseEndAt = 0; // while running: when the current phase ends (ms)
+  let lastTickAt = 0; // while running: the clock time already accounted for
+  let workCarryMs = 0; // focus time not yet credited as a whole second
   let timerId = null;
   let running = false;
+  const TICK_MS = 250;
+  // Ticks this far apart mean the PC was asleep (the suspend event can be
+  // missed); that gap isn't counted, and the timer pauses. Well above the
+  // one-minute throttling a hidden window can still get.
+  const SLEEP_GAP_MS = 3 * 60 * 1000;
   let userAccentColor = '#f2405a';
   const BREAK_ACCENT_COLOR = '#40e0d0'; // turquoise
   let totalTurns = 0; // completed work sessions, persisted
@@ -58,16 +72,16 @@
 
   function timerState() {
     if (running) return 'running';
-    return remainingSec === currentDurationSec() ? 'idle' : 'paused';
+    return remainingMs === currentDurationSec() * 1000 ? 'idle' : 'paused';
   }
 
   function render() {
     const state = timerState();
     el.app.dataset.state = state;
-    el.timerDisplay.textContent = fmt(remainingSec);
+    el.timerDisplay.textContent = fmt(Math.ceil(remainingMs / 1000));
     el.startPauseBtn.classList.toggle('running', running);
     el.startPauseBtn.title = running ? 'Pause' : 'Start';
-    const remainingFraction = remainingSec / currentDurationSec();
+    const remainingFraction = remainingMs / (currentDurationSec() * 1000);
     // The arc spans [start, 360deg]; start advancing clockwise from 12
     // o'clock is the depleted portion growing clockwise.
     el.ringFill.style.setProperty('--ring-start', `${360 * (1 - remainingFraction)}deg`);
@@ -127,9 +141,9 @@
   }
 
   function resetTimer() {
-    if (mode === 'work') finishSession(false);
     stopTick();
-    remainingSec = currentDurationSec();
+    if (mode === 'work') finishSession(false);
+    remainingMs = currentDurationSec() * 1000;
     running = false;
     render();
   }
@@ -160,6 +174,7 @@
   function finishSession(completed) {
     const done = session;
     session = null;
+    workCarryMs = 0;
     if (!done || (!completed && done.workedSec < MIN_RECORDED_SEC)) return;
     window.pomodoro.addSession({
       start: done.start,
@@ -177,7 +192,7 @@
     }
     mode = mode === 'work' ? 'break' : 'work';
     saveStats();
-    remainingSec = currentDurationSec();
+    remainingMs = currentDurationSec() * 1000;
     applyModeColor();
     // `mode` is already the phase that's starting.
     const title = mode === 'work' ? 'Break is over' : 'Focus time is over';
@@ -189,38 +204,73 @@
     playPhaseSweep();
   }
 
-  function tick() {
-    if (mode === 'work') {
-      if (!session) session = { start: new Date(Date.now() - 1000).toISOString(), workedSec: 0 };
-      session.workedSec += 1;
-      totalStudySeconds += 1;
-      // Batched so a running timer doesn't rewrite settings.json every second;
-      // at most this many seconds are lost if the app is killed outright.
-      if (++unsavedStudySeconds >= 10) saveStats();
-    }
-    remainingSec -= 1;
-    if (remainingSec <= 0) {
+  // Credits focus time in whole seconds; the remainder carries over.
+  function creditWork(ms) {
+    if (ms <= 0) return;
+    if (!session) session = { start: new Date(lastTickAt).toISOString(), workedSec: 0 };
+    workCarryMs += ms;
+    const whole = Math.floor(workCarryMs / 1000);
+    workCarryMs -= whole * 1000;
+    session.workedSec += whole;
+    totalStudySeconds += whole;
+    unsavedStudySeconds += whole;
+    // Batched so a running timer doesn't rewrite settings.json every second;
+    // at most this many seconds are lost if the app is killed outright.
+    if (unsavedStudySeconds >= 10) saveStats();
+  }
+
+  // Accounts for the clock up to `now`, switching phases as they end. Each
+  // new phase starts exactly where the last one ended, so a late tick
+  // shifts nothing.
+  function advanceTo(now) {
+    for (;;) {
+      const upTo = Math.min(now, phaseEndAt);
+      if (mode === 'work') creditWork(upTo - lastTickAt);
+      lastTickAt = upTo;
+      if (now < phaseEndAt) break;
       switchMode();
+      phaseEndAt = upTo + remainingMs;
     }
+    remainingMs = phaseEndAt - now;
+  }
+
+  function tick() {
+    const now = Date.now();
+    if (now - lastTickAt > SLEEP_GAP_MS) {
+      pauseAt(lastTickAt);
+      return;
+    }
+    advanceTo(now);
     render();
   }
 
   function startTick() {
     if (timerId) return;
     running = true;
-    timerId = setInterval(tick, 1000);
+    lastTickAt = Date.now();
+    phaseEndAt = lastTickAt + remainingMs;
+    timerId = setInterval(tick, TICK_MS);
     render();
   }
 
-  function stopTick() {
+  // Stops the clock as of `at` (now, or the last tick before a sleep).
+  function pauseAt(at) {
     if (timerId) {
       clearInterval(timerId);
       timerId = null;
+      advanceTo(at);
     }
     if (unsavedStudySeconds > 0) saveStats();
     running = false;
     render();
   }
+
+  function stopTick() {
+    pauseAt(Date.now());
+  }
+
+  // The PC going to sleep pauses the timer; it stays paused after waking.
+  window.pomodoro.onSuspend(() => stopTick());
 
   el.startPauseBtn.addEventListener('click', () => {
     window.pomodoro.closeNotification();
@@ -233,11 +283,21 @@
     resetTimer();
   });
 
+  // Reset Session: the timer goes all the way back to a fresh, idle focus
+  // period (like ↻, an in-progress focus session of a minute or more is
+  // still recorded), and both totals return to 0.
   el.statsResetBtn.addEventListener('click', () => {
+    window.pomodoro.closeNotification();
+    stopTick();
+    if (mode === 'work') finishSession(false);
+    session = null;
+    mode = 'work';
+    applyModeColor();
+    remainingMs = currentDurationSec() * 1000;
     totalTurns = 0;
     totalStudySeconds = 0;
     saveStats();
-    renderStats();
+    render();
   });
 
   // Changing minute inputs while stopped updates the visible countdown immediately.
@@ -272,7 +332,44 @@
 
   function setPinButtonState(locked) {
     el.pinBtn.setAttribute('aria-pressed', String(locked));
+    el.app.classList.toggle('size-locked', locked);
   }
+
+  // Edge and corner handles resize the window (the window is transparent,
+  // so it has no native resize border). Pointer capture keeps the moves
+  // coming while the cursor is outside the window; at most one resize is
+  // sent per frame, and the last one always goes out.
+  document.querySelectorAll('#resize-handles > div').forEach((handle) => {
+    handle.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      const { edge } = handle.dataset;
+      const startX = e.screenX;
+      const startY = e.screenY;
+      let pending = null;
+      let done = false;
+      const flush = () => {
+        if (pending) window.pomodoro.resizeMove(edge, pending.dx, pending.dy);
+        pending = null;
+      };
+      const move = (ev) => {
+        if (!pending) requestAnimationFrame(flush);
+        pending = { dx: ev.screenX - startX, dy: ev.screenY - startY };
+      };
+      const end = () => {
+        if (done) return;
+        done = true;
+        flush();
+        window.pomodoro.resizeEnd();
+        handle.removeEventListener('pointermove', move);
+      };
+      window.pomodoro.resizeStart();
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', end, { once: true });
+      handle.addEventListener('lostpointercapture', end, { once: true });
+    });
+  });
 
   el.pinBtn.addEventListener('click', async () => {
     const locked = el.pinBtn.getAttribute('aria-pressed') !== 'true';
@@ -283,7 +380,14 @@
   // Works whether or not pinned; leaving fullscreen restores the exact size
   // and position the window had before.
   el.fullscreenBtn.addEventListener('click', () => window.pomodoro.toggleFullscreen());
-  // Also fires when Esc or a drag leaves fullscreen.
+  // Double-clicking the widget flips fullscreen <-> windowed, except on its
+  // controls (and the panel), where a double-click means something else.
+  // Over the drag region this never fires on Windows; main catches those.
+  document.addEventListener('dblclick', (e) => {
+    if (e.target.closest('button, input, select, textarea, label, [role="button"], #settings-panel, #resize-handles')) return;
+    window.pomodoro.toggleFullscreen();
+  });
+  // Also fires when Esc leaves fullscreen.
   window.pomodoro.onFullscreenChange((on) => {
     el.fullscreenBtn.title = on ? 'Windowed (Esc)' : 'Fullscreen';
     el.app.classList.toggle('fullscreen', on);
@@ -360,6 +464,53 @@
     window.dispatchEvent(new Event('goals-changed'));
   });
 
+  // The timer goal's own entry in the Goals list: an open goal with the
+  // same title (any case), else the latest reached one.
+  function matchGoal(goals) {
+    const title = el.taskInput.value.trim().toLowerCase();
+    if (!title) return null;
+    const same = goals.filter((g) => g.title.toLowerCase() === title);
+    return same.find((g) => !g.doneAt) || same[0] || null;
+  }
+
+  let goalCheckToken = 0;
+  async function refreshGoalCheck() {
+    const token = ++goalCheckToken;
+    el.goalField.classList.toggle('has-goal', !!el.taskInput.value.trim());
+    const goal = matchGoal(await window.pomodoro.listGoals());
+    if (token !== goalCheckToken) return; // a newer refresh is on its way
+    const reached = !!(goal && goal.doneAt);
+    el.goalCheck.setAttribute('aria-checked', String(reached));
+    el.goalCheck.title = reached ? 'Reached. Click to mark as not reached' : 'Mark this goal as reached';
+  }
+
+  // Clicking the check flips the goal's reached state. Reaching it moves the
+  // timer on to the next unreached goal in the Goals list; when every goal
+  // is reached, this one stays.
+  el.goalCheck.addEventListener('click', async () => {
+    const title = el.taskInput.value.trim();
+    if (!title) return;
+    const goals = await window.pomodoro.listGoals();
+    const goal = matchGoal(goals);
+    if (goal && goal.doneAt) {
+      await window.pomodoro.setGoalDone(goal.id, false);
+    } else {
+      const reached = goal || await window.pomodoro.addGoal(title);
+      await window.pomodoro.setGoalDone(reached.id, true);
+      const open = goals.filter((g) => !g.doneAt);
+      const at = open.findIndex((g) => g.id === reached.id);
+      const next = (at >= 0 && open[at + 1]) || open.find((g) => g.id !== reached.id);
+      if (next) {
+        el.taskInput.value = next.title;
+        el.taskInput.dispatchEvent(new Event('change'));
+      }
+    }
+    window.dispatchEvent(new Event('goals-changed'));
+  });
+
+  ['goals-changed', 'task-changed'].forEach((name) => window.addEventListener(name, refreshGoalCheck));
+  el.taskInput.addEventListener('input', refreshGoalCheck);
+
   el.cornerButtons.forEach((btn) => {
     btn.addEventListener('click', async () => {
       const displayId = Number(el.displaySelect.value);
@@ -402,9 +553,10 @@
     applyBackgroundTint(settings.backgroundTintColor, Math.round(settings.backgroundTintOpacity * 100));
     if (background) setBackgroundImage(background.dataUrl);
     el.taskInput.value = settings.currentTask;
+    refreshGoalCheck();
     totalTurns = settings.totalTurns;
     totalStudySeconds = settings.totalStudySeconds;
-    remainingSec = settings.workMinutes * 60;
+    remainingMs = currentDurationSec() * 1000;
     render();
     await populateDisplays();
   }

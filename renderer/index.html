@@ -41,12 +41,21 @@
           </svg>
         </button>
       </div>
-      <input id="task-input" type="text" maxlength="120" placeholder="Goal for this session"
-             title="Press Enter to add it to Goals. Pick a goal in the Goals tab to set it here. Saved with each focus session." />
+      <div id="goal-field">
+        <button id="goal-check" role="checkbox" aria-checked="false" aria-label="Goal reached" title="Mark this goal as reached">
+          <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M3.5 8.3 L6.6 11.2 L12.5 4.8" /></svg>
+        </button>
+        <input id="task-input" type="text" maxlength="120" placeholder="Goal for this session"
+               title="Press Enter to add it to Goals. Pick a goal in the Goals tab to set it here. Saved with each focus session." />
+      </div>
       <div id="stats">
         <div class="stat-row"><span>Total turns</span><span id="total-turns">0</span></div>
         <div class="stat-row"><span>Total study time</span><span id="total-study">0m</span></div>
-        <button id="stats-reset-btn" title="Reset total turns and study time to 0">Reset</button>
+        <button id="stats-reset-btn" title="Reset total turns and study time to 0">Reset Session</button>
+      </div>
+      <!-- anchored to main, so it rides just above the panel when that opens -->
+      <div class="corner-actions bottom">
+        <button id="gear-btn" title="Goals · Calendar · Settings"></button>
       </div>
     </main>
 
@@ -153,11 +162,16 @@
       </div>
       </div>
     </section>
+  </div>
 
-    <!-- after the panel in the DOM so it stays on top of it when open -->
-    <div class="corner-actions bottom">
-      <button id="gear-btn" title="Goals · Calendar · Settings"></button>
-    </div>
+  <!-- Transparent windows get no native resize border, so these thin edge
+       and corner strips resize the window instead (hidden while the size
+       is locked or fullscreen). -->
+  <div id="resize-handles" aria-hidden="true">
+    <div data-edge="n"></div><div data-edge="s"></div>
+    <div data-edge="e"></div><div data-edge="w"></div>
+    <div data-edge="nw"></div><div data-edge="ne"></div>
+    <div data-edge="sw"></div><div data-edge="se"></div>
   </div>
 
   <script src="renderer.js"></script>

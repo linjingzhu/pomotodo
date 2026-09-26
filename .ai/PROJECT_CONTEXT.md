@@ -491,6 +491,58 @@ commands → the compile and build ladder and every report; `generated` →
   - Events: `goals-changed` and `task-changed` keep the list fresh.
   - The placeholder is now "Goal for this session".
   - E2E under Xvfb used real typing: insertText plus an Enter keydown.
+- 1.0.5 UI fixes, per the user.
+  - The gear dot now lives inside `<main>` (`position: relative`), so it
+    sits at the bottom-right of the timer area and rides just above the
+    panel when that opens, instead of staying pinned to the window corner.
+  - Calendar: today is shown in bright orange (#ffa53d, number and ring);
+    the goal-reached check marks on days were removed. Reached goals are
+    still listed in the day view.
+  - The stats reset button reads "Reset Session".
+  - Edge-drag resizing, which never worked on Windows: Electron documents
+    transparent windows as not resizable, yet a resizable frameless
+    window still reserves a dead ~5px native resize strip at its edges.
+    The window is now always `resizable: false` (those pixels then reach
+    the page, measured with real X input under Xvfb). Eight
+    `#resize-handles` strips/corners drive `window:resizeStart/Move/End`,
+    which recomputes bounds from the drag start and applies them via
+    `withResizeUnlocked`. The size lock is now an app flag only (handles
+    hidden, main refuses). Fullscreen hides the handles, main refuses, and
+    a `will-resize` backstop cancels anything else; setFullScreen is
+    wrapped in `withResizeUnlocked`.
+  - Goal check: a round check at the timer goal field's left, shown on
+    hover or focus once there is a goal, shows that goal's reached state.
+    A click flips it. Reaching it loads the next unreached goal in the
+    Goals list order (after it, else the first one); when all are
+    reached, the goal stays. Text not yet in the list is added, then
+    marked reached. Goal edits anywhere dispatch `goals-changed`.
+  - Reset Session also resets the timer fully: stop, record an
+    in-progress focus session like ↻ does, back to work mode, idle.
+  - A double-click on the widget flips fullscreen <-> windowed. Over the
+    drag region Windows gives the page no mouse events, so main hooks
+    `WM_NCLBUTTONDBLCLK` (HTCAPTION only) and defers `toggleFullscreen`;
+    elsewhere (fullscreen is all no-drag) a page `dblclick` does it,
+    skipping buttons, inputs, labels, the panel and the resize handles.
+    Not verifiable here: Xvfb has no WM, so a "fullscreen" X window keeps
+    its old geometry, and under Wine xdotool input never reached the app
+    window. The page path was checked with sendInputEvent.
+  - Timer bug found in research: it counted one second per
+    `setInterval` tick, and a hidden window's timers are throttled
+    (Chromium intensive throttling; `backgroundThrottling` was on), so in
+    the tray it ran about 1 second per minute (measured: 7 minutes hidden
+    = 5 seconds). Now it keeps time by the wall clock (`phaseEndAt`,
+    `advanceTo` crediting focus time in whole seconds with a carry; each
+    new phase starts where the last ended), ticks every 250ms, and
+    `backgroundThrottling: false` keeps phase ends on time.
+    `powerMonitor` 'suspend' pauses it (it stays paused, per the user);
+    a gap of more than 3 minutes between ticks is treated as a missed
+    suspend: not credited, and paused. settings.json is now written to a
+    temp file and renamed, like records.json.
+  - Focused text, number and select fields drop the browser focus ring
+    (orange on Windows, drawn outside the box and clipped by the
+    scrolling panel) for a brighter border. Select options get a dark
+    background and light text: the native popup's white background hid
+    the inherited white text of unselected items.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
