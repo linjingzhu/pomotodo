@@ -380,6 +380,13 @@ commands → the compile and build ladder and every report; `generated` →
     scrolls.
   - Verified under Xvfb at 300x460, 320x380, 260x330 and with settings
     open. xdotool hover over a drag area toggles the dots on and off.
+- Gauge: the default is now a filled pie (the same conic gradient, masked
+  to a disc out to the track's outer edge, 85% alpha at the moving edge
+  so the digits stay readable). Settings > Gauge style switches between
+  `pie` and `stroke` via `#app[data-gauge]`, persisted as `gaugeStyle`.
+  Play/pause lost `.primary` and is now clear glass like reset, so the
+  idle-state overrides were dropped. Both styles and persistence across
+  a restart were verified under Xvfb.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

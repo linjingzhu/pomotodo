@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS = {
   backgroundTintColor: '#15161e',
   backgroundTintOpacity: 0,
   accentColor: '#f2405a',
+  gaugeStyle: 'pie',
   windowWidth: 300,
   windowHeight: 460,
   totalTurns: 0,

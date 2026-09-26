@@ -26,7 +26,7 @@
         <div id="timer-display">25:00</div>
       </div>
       <div id="controls">
-        <button id="start-pause-btn" class="primary" title="Start">
+        <button id="start-pause-btn" title="Start">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
             <path id="play-icon" d="M4 2.5 L13 8 L4 13.5 Z" />
             <g id="pause-icon">
@@ -112,6 +112,13 @@
       <div class="row">
         <label for="accent-color">Key color (work; break is always turquoise)</label>
         <input type="color" id="accent-color" />
+      </div>
+      <div class="row">
+        <label for="gauge-style">Gauge style</label>
+        <select id="gauge-style">
+          <option value="pie">Filled pie</option>
+          <option value="stroke">Stroke</option>
+        </select>
       </div>
     </section>
   </div>

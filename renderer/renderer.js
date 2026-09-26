@@ -29,6 +29,7 @@
     bgTintColor: document.getElementById('bg-tint-color'),
     bgTintOpacity: document.getElementById('bg-tint-opacity'),
     accentColor: document.getElementById('accent-color'),
+    gaugeStyle: document.getElementById('gauge-style'),
   };
 
 
@@ -300,6 +301,11 @@
     userAccentColor = el.accentColor.value;
     applyModeColor();
   });
+  el.gaugeStyle.addEventListener('change', () => {
+    el.app.dataset.gauge = el.gaugeStyle.value;
+    window.pomodoro.saveSettings({ gaugeStyle: el.gaugeStyle.value });
+  });
+
   el.accentColor.addEventListener('change', () => {
     window.pomodoro.saveSettings({ accentColor: el.accentColor.value });
   });
@@ -348,6 +354,8 @@
     el.bgTintColor.value = settings.backgroundTintColor;
     el.bgTintOpacity.value = Math.round(settings.backgroundTintOpacity * 100);
     el.accentColor.value = settings.accentColor;
+    el.gaugeStyle.value = settings.gaugeStyle;
+    el.app.dataset.gauge = settings.gaugeStyle;
     userAccentColor = settings.accentColor;
     applyModeColor();
     applyBackgroundBlur(settings.backgroundBlur);
