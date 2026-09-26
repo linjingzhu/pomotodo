@@ -82,9 +82,14 @@ function listGoals(file) {
 function addGoal(file, title) {
   const text = String(title || '').trim().slice(0, 200);
   if (!text) return null;
-  const goal = { id: crypto.randomUUID(), title: text, createdAt: new Date().toISOString(), doneAt: null };
-  update(file, (data) => data.goals.push(goal));
-  return goal;
+  return update(file, (data) => {
+    // an open goal with the same title (any case) is reused, not duplicated
+    const existing = data.goals.find((g) => !g.doneAt && g.title.toLowerCase() === text.toLowerCase());
+    if (existing) return { ...existing };
+    const goal = { id: crypto.randomUUID(), title: text, createdAt: new Date().toISOString(), doneAt: null };
+    data.goals.push(goal);
+    return goal;
+  });
 }
 
 function setGoalDone(file, id, done) {

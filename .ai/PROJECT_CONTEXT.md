@@ -462,6 +462,35 @@ commands → the compile and build ladder and every report; `generated` →
   top-right cluster, which is now close · pin · fullscreen. It sits
   15px/15px from the corner, above the tab body's 32px bottom padding.
   Version 1.0.3.
+- Window size and fullscreen, per the user:
+  - The launch size equals the expanded-panel size, 300x780 (the
+    largest). The panel opens inside the window, and `window:resize`, the
+    COLLAPSED/EXPANDED sizes and pinnedSize were all removed. It is
+    clamped to the primary work area height. Old installs are migrated
+    once via `fullHeightLayout`, and later manual sizes are kept.
+  - Fullscreen state is tracked in main (`fullscreenBounds`) instead of
+    via isFullScreen(). Exit restores the exact pre-fullscreen bounds,
+    pinned or not: once immediately, again on 'leave-full-screen', and
+    again after 400ms. A re-entrancy guard is needed because setBounds
+    while leaving fullscreen re-emits 'leave-full-screen' synchronously
+    (a stack overflow reproduced under Xvfb).
+  - Esc exits, via before-input-event.
+  - The window is locked while fullscreen: `#app.fullscreen` sets
+    no-drag, plus a `will-move` preventDefault. The user first asked for
+    drag-to-exit, then changed it to locked.
+  - The renderer is told of changes via `window:fullscreen` (button title,
+    class).
+  - Version 1.0.4.
+- The timer's goal field is synced with the Goals list, per the user.
+  - Enter in `#task-input` adds the text as a goal. `store.addGoal` now
+    reuses an open goal with the same title, case-insensitively, and the
+    field is then normalized to that goal's title.
+  - Clicking a goal title (or Enter/Space on it) in the Goals tab sets it
+    as the timer's goal. The current goal is highlighted in the key
+    color.
+  - Events: `goals-changed` and `task-changed` keep the list fresh.
+  - The placeholder is now "Goal for this session".
+  - E2E under Xvfb used real typing: insertText plus an Enter keydown.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
