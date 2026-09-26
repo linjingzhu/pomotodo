@@ -102,66 +102,39 @@ html, body {
   opacity: 1;
 }
 
-/* Three small uniform dots; the 22px button box is just the hit target and
-   hover highlight, invisible until hovered. Tooltips (title=) carry the
-   function name since the dots themselves no longer show an icon. */
+/* No icons at all - each button IS a small 10px circle. The window is
+   transparent, so whatever's behind them on the real desktop is unknown;
+   a dark drop-shadow keeps a white dot legible either way. Tooltips
+   (title=) carry the function name since there's no icon to hint at it. */
 #pin-btn,
 #gear-btn,
 #close-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  width: 22px;
-  height: 22px;
+  width: 10px;
+  height: 10px;
   padding: 0;
-  flex-shrink: 0;
+  border: none;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s ease, transform 0.1s ease;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, transform 0.1s ease, background 0.15s ease;
 }
-#pin-btn:hover { background: var(--glass-bg-strong); }
-#gear-btn:hover { background: var(--glass-bg-strong); }
+#pin-btn:hover, #gear-btn:hover, #close-btn:hover { opacity: 1; }
 #close-btn:hover { background: var(--accent); }
-#pin-btn:active, #gear-btn:active, #close-btn:active { transform: scale(0.88); }
+#pin-btn:active, #gear-btn:active, #close-btn:active { transform: scale(0.8); }
 
-/* Distinct shapes per button (X close / square settings / circle pin),
-   same shared weight: dim until hovered, full white on hover. The window
-   is transparent, so whatever's behind these icons on the real desktop is
-   unknown - a dark drop-shadow keeps white-on-white legible without
-   hurting contrast on a dark background too. */
-.titlebar-actions svg {
-  opacity: 0.6;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
-  transition: opacity 0.15s ease;
-}
-#pin-btn:hover svg, #gear-btn:hover svg, #close-btn:hover svg {
+/* Pin toggle: hollow ring when off, solid filled dot when the window size
+   is locked - the one dot with real on/off state to show. */
+#pin-btn {
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
   opacity: 1;
 }
-
-#close-btn svg path {
-  fill: none;
-  stroke: white;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-}
-#gear-btn svg rect {
-  fill: white;
-}
-
-/* Pin toggle: hollow (stroke-only) when off, solid (filled) when the
-   window size is locked - the one dot with real on/off state to show. */
-#pin-btn svg circle {
-  fill: none;
-  stroke: white;
-  stroke-width: 2;
-  transition: fill 0.15s ease, stroke 0.15s ease;
-}
-#pin-btn svg { opacity: 1; }
-#pin-btn[aria-pressed="true"] svg circle {
-  fill: white;
-  stroke: none;
+#pin-btn[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
 }
 
 main {

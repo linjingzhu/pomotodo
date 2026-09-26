@@ -93,12 +93,14 @@ commands → the compile and build ladder and every report; `generated` →
   rounded div be the whole shape, window edges included — the area outside
   it is genuinely transparent to the desktop. The pin/gear/close cluster is
   `position: absolute`, `opacity: 0` by default, revealed only on
-  `#app:hover`, so the idle widget stays clean. Top to bottom: close (✕, an
-  inline SVG path), settings (□, a rounded rect), pin (○, a circle — the
-  one with real state, hollow unlocked / solid white locked); each still
-  carries a native `title=` tooltip. A `drop-shadow` on the whole icon
-  keeps them legible regardless of what's behind the transparent window.
-  No text mode-label — the ring's own color (key color for work,
+  `#app:hover`, so the idle widget stays clean. Top to bottom: close,
+  settings, pin — no icon glyphs at all now, each button IS a plain 10px
+  circle (`width/height: 10px`, `border-radius: 50%`), identified only by
+  its native `title=` tooltip. Pin is the one with real state: hollow
+  (`border`, transparent `background`) unlocked, solid filled locked. A
+  `box-shadow` keeps the white dots legible regardless of what's behind
+  the transparent window. No text mode-label — the ring's own color (key
+  color for work,
   fixed turquoise for break) is the only mode indicator now.
 - `package.json` — `electron-builder` config targets `nsis` (installer) and
   `portable` for `win`/`x64`.
@@ -222,6 +224,12 @@ commands → the compile and build ladder and every report; `generated` →
   issue rather than a rendering bug, then fixed with the shadow rather than
   changing the icon color outright (since the transparent window's real
   background is unknown either way).
+- Dropped the X/square/circle icon shapes entirely per a follow-up
+  request: the three buttons are now plain 10px circles with no inner SVG
+  at all, the button element itself is the dot (confirmed 10x10 via
+  `getBoundingClientRect()` under Xvfb). Pin's hollow/filled state moved
+  from an inner circle's fill/stroke to the button's own
+  background/border.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
