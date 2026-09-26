@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('pomodoro', {
   setAlwaysOnTop: (flag) => ipcRenderer.invoke('window:setAlwaysOnTop', flag),
   setSizeLocked: (flag) => ipcRenderer.invoke('window:setSizeLocked', flag),
   toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
+  setProgress: (state, fraction, label) => ipcRenderer.send('window:progress', { state, fraction, label }),
   resizeStart: () => ipcRenderer.send('window:resizeStart'),
   resizeMove: (edge, dx, dy) => ipcRenderer.send('window:resizeMove', { edge, dx, dy }),
   resizeEnd: () => ipcRenderer.send('window:resizeEnd'),
