@@ -350,6 +350,16 @@ commands → the compile and build ladder and every report; `generated` →
   - Release v1.0.0 is published: Setup, Portable and SHA256SUMS.
   - The Setup exe was downloaded anonymously and its checksum matches.
     It installs under Wine.
+- Before merging I read `.ai/REPOSITORY.md` § *Paid automation*. It
+  requires an owner approval record plus a workflow that fails closed.
+  Neither had been done.
+  - Added OA-13 as the approval record.
+  - Added a first step that exits unless `repository.private == false`
+    and today is on or before 2027-03-26. That date is Claude's proposal;
+    the owner can change it.
+  - Dropped the feature branch from the triggers.
+  - Lesson: read REPOSITORY.md before adding any automation, not at merge
+    time.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

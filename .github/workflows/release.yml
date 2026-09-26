@@ -1,9 +1,12 @@
 # Builds the Windows installer and portable exe and publishes them as a
 # GitHub Release named after package.json's version.
 #
-# Kept inside the free Actions allowance:
-# - Linux runners only (Windows runners bill minutes at 2x); the Windows
-#   build runs under Wine in electron-builder's own image.
+# Owner-approved on the condition that it never costs money (OA-13 in
+# docs/OWNER_ACTIONS.md). It fails closed: nothing builds unless the repo
+# is verifiably public (standard runners are free there) and the approval
+# hasn't expired. Beyond that it stays small:
+# - Linux runners only; the Windows build runs under Wine in
+#   electron-builder's own image.
 # - Runs only when package.json or this file changes, or when started by
 #   hand, and the build job is skipped outright when the release for the
 #   current version already exists - bump "version" to release again.
@@ -13,7 +16,7 @@ name: Release
 
 on:
   push:
-    branches: [stable, jeongsu/festive-fermat-p6igdu]
+    branches: [stable]
     paths: [package.json, .github/workflows/release.yml]
   workflow_dispatch:
 
@@ -32,6 +35,19 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       exists: ${{ steps.exists.outputs.exists }}
     steps:
+      - name: Fail closed unless the run is verifiably free
+        env:
+          IS_PRIVATE: ${{ github.event.repository.private }}
+          APPROVAL_EXPIRES: '2027-03-26'
+        run: |
+          if [ "$IS_PRIVATE" != "false" ]; then
+            echo "::error::Repository is not verifiably public (private='$IS_PRIVATE'); Actions may not be free. Not building."
+            exit 1
+          fi
+          if [ "$(date -u +%Y-%m-%d)" \> "$APPROVAL_EXPIRES" ]; then
+            echo "::error::The owner's approval for this workflow expired on $APPROVAL_EXPIRES (OA-13). Renew it before releasing."
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           sparse-checkout: package.json
