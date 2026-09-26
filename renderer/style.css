@@ -8,13 +8,23 @@
   --text: #f5f5f7;
   --text-muted: #8b8d9c;
 
-  /* Glassmorphism: a translucent, blurred, thin-bordered surface that lets
-     the background image/tint show through instead of an opaque panel. */
-  --glass-bg: rgba(255, 255, 255, 0.07);
-  --glass-bg-strong: rgba(255, 255, 255, 0.1);
-  --glass-border: rgba(255, 255, 255, 0.16);
-  --glass-blur: 16px;
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  /* Liquid Glass: a deeply blurred, saturated, translucent material with a
+     bright rim catching light along its top edge and a soft dark edge along
+     its bottom, so surfaces read as thick curved glass rather than a flat
+     tinted panel. */
+  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+  --glass-bg-strong: rgba(255, 255, 255, 0.16);
+  --glass-border: rgba(255, 255, 255, 0.32);
+  --glass-blur: 26px;
+  --glass-saturate: 180%;
+  --glass-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.2);
+  --glass-shadow-sm:
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.18);
 }
 
 html, body {
@@ -67,9 +77,10 @@ html, body {
   justify-content: space-between;
   padding: 6px 10px;
   background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   border-bottom: 1px solid var(--glass-border);
+  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.15);
   -webkit-app-region: drag;
   font-size: 12px;
   font-weight: 700;
@@ -91,15 +102,18 @@ html, body {
   color: var(--text-muted);
   font-size: 14px;
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 #pin-btn:hover { background: var(--glass-bg-strong); }
 #gear-btn:hover { background: var(--glass-bg-strong); color: var(--text); }
 #close-btn:hover { background: var(--accent); color: white; }
+#pin-btn:active, #gear-btn:active, #close-btn:active { transform: scale(0.88); }
 
 /* Pin toggle: a hollow (stroke-only) circle when off, a solid (filled)
    circle when the window size is locked. */
@@ -107,6 +121,7 @@ html, body {
   fill: none;
   stroke: white;
   stroke-width: 2;
+  transition: fill 0.15s ease, stroke 0.15s ease;
 }
 #pin-btn[aria-pressed="true"] svg circle {
   fill: white;
@@ -129,12 +144,12 @@ main {
   align-items: center;
   gap: 14px;
   padding: 26px;
-  border-radius: 20px;
+  border-radius: 32px;
   background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: var(--glass-shadow);
 }
 
 #timer-ring {
@@ -167,7 +182,8 @@ main {
   stroke-linecap: round;
   stroke-dasharray: 326.7256;
   stroke-dashoffset: 0;
-  transition: stroke-dashoffset 0.3s linear;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 70%, transparent));
+  transition: stroke-dashoffset 0.3s linear, stroke 0.3s ease;
 }
 
 #timer-display {
@@ -182,25 +198,33 @@ main {
 
 #controls {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
 }
 
 button {
   font-family: inherit;
   font-size: 13px;
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
   border: 1px solid var(--glass-border);
   background: var(--glass-bg-strong);
   color: var(--text);
   cursor: pointer;
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow-sm);
+  transition: background 0.15s ease, filter 0.15s ease, transform 0.1s ease;
 }
-button:hover { background: rgba(255, 255, 255, 0.16); }
+button:hover { background: rgba(255, 255, 255, 0.24); }
+button:active { transform: scale(0.96); }
+
 #start-pause-btn {
-  width: 44px;
-  padding: 8px;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 #start-pause-btn svg { fill: currentColor; }
 #start-pause-btn #pause-icon { display: none; }
@@ -212,16 +236,22 @@ button.primary {
   border-color: var(--accent);
   color: white;
   font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: var(--glass-shadow-sm);
 }
 button.primary:hover { filter: brightness(1.12); }
 
+/* Denser text needs more contrast than the titlebar/card can spare, so the
+   panel is deliberately less see-through: a darker tint under the same
+   blur, plus a text-shadow on labels below, keep rows legible over any
+   background image. */
 #settings-panel {
-  padding: 10px 12px 14px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  padding: 12px 14px 16px;
+  background: linear-gradient(160deg, rgba(10, 10, 16, 0.62), rgba(10, 10, 16, 0.5));
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
   border-top: 1px solid var(--glass-border);
+  border-radius: 24px 24px 0 0;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3);
   font-size: 12px;
   display: flex;
   flex-direction: column;
@@ -245,6 +275,7 @@ button.primary:hover { filter: brightness(1.12); }
 .row label {
   color: var(--text-muted);
   flex: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 input[type="number"] {
@@ -252,8 +283,8 @@ input[type="number"] {
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   color: var(--text);
-  border-radius: 4px;
-  padding: 3px 6px;
+  border-radius: 10px;
+  padding: 4px 8px;
   font-size: 12px;
 }
 
@@ -273,7 +304,7 @@ input[type="color"] {
   height: 24px;
   padding: 0;
   border: 1px solid var(--glass-border);
-  border-radius: 4px;
+  border-radius: 8px;
   background: none;
   cursor: pointer;
 }
@@ -290,18 +321,19 @@ hr {
 }
 #corner-grid button {
   font-size: 13px;
-  padding: 4px;
-  width: 26px;
-  height: 26px;
+  padding: 0;
+  width: 28px;
+  height: 28px;
   line-height: 1;
+  border-radius: 50%;
 }
 
 select {
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   color: var(--text);
-  border-radius: 4px;
-  padding: 3px 6px;
+  border-radius: 10px;
+  padding: 4px 8px;
   font-size: 12px;
   max-width: 150px;
 }

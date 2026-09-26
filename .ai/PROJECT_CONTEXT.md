@@ -157,6 +157,18 @@ commands → the compile and build ladder and every report; `generated` →
   `resizable: false`. Fixed by having the `window:resize` IPC handler
   briefly unlock, resize, and relock around every programmatic resize —
   the window is never user-draggable in between, since it's synchronous.
+- Reworked the glassmorphism pass into a "Liquid Glass" look (Apple's
+  material language): deeper blur (16px → 26px) plus
+  `backdrop-filter: saturate(180%)` for color bleed-through, a layered
+  `--glass-shadow` (outer drop shadow + inset top highlight + inset bottom
+  shadow) for a sense of glass thickness, pill/circular button shapes
+  (`border-radius: 999px`/`50%`), a soft `drop-shadow` glow on the ring's
+  accent arc, and `:active` press-scale feedback. The settings panel keeps
+  its own darker, less-saturated background (`saturate(140%)` over a
+  near-opaque dark gradient, plus a text-shadow on row labels) because the
+  saturated titlebar/card treatment made its denser text unreadable over a
+  busy background image — verified by screenshotting both before and after
+  that fix under Xvfb with a vivid gradient standing in for a busy photo.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
