@@ -362,9 +362,10 @@ button:active { transform: scale(0.96); }
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
-  /* capped so the timer above keeps most of its size; the panel scrolls */
-  flex: 0 1 auto;
-  max-height: 48%;
+  /* One fixed height for every tab, so switching tabs never moves the timer
+     above; short tabs leave space at the bottom, long ones scroll. */
+  flex: 0 0 48%;
+  min-height: 0;
   -webkit-app-region: no-drag;
 }
 #settings-panel.hidden { display: none; }
@@ -639,3 +640,12 @@ input[type="password"] {
 }
 .session-note { width: 100%; }
 .goal-reached { color: #40e0d0; }
+
+/* Thin, translucent scrollbar so the dark panel doesn't get a white bar. */
+#settings-panel::-webkit-scrollbar { width: 6px; }
+#settings-panel::-webkit-scrollbar-track { background: transparent; }
+#settings-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+}
+#settings-panel::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }

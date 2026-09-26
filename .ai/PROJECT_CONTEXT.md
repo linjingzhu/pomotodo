@@ -422,6 +422,11 @@ commands → the compile and build ladder and every report; `generated` →
   - The portable build contains the new files and runs under Wine.
   - No product-design skill exists for this user (listed and searched);
     `.ai/UX.md` was used instead.
+- Panel height is now fixed at 48% of #app for every tab (`flex: 0 0 48%`),
+  per the user, so switching tabs never moves the timer. Goals may leave
+  empty space; Calendar and Settings scroll. It measured 371px on all
+  three tabs under Xvfb. Also added a thin translucent scrollbar and
+  bumped the version to 1.0.2.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
