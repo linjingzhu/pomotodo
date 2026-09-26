@@ -312,6 +312,23 @@ commands → the compile and build ladder and every report; `generated` →
     can stop toasts from showing on installed builds.
   - The lifecycle was verified with a stubbed Notification via a
     Module._load hook. Windows rendering is OA-12.
+- Windows installer built in the container (no Windows machine needed):
+  - Installed Wine 9.0 from the Ubuntu archive, with the 32-bit variant,
+    because NSIS runs its 32-bit installer to extract the uninstaller.
+  - The container's `libgd3` came from the ondrej/php PPA and blocked
+    `libgd3:i386`. Downgrading amd64 to the archive version 2.3.3-9ubuntu5
+    unblocked it. That downgrade is in the container only, not the repo.
+  - Then `npx electron-builder --win --x64` produced
+    `dist/PomodoroTimer-Setup-1.0.0.exe` and `-Portable-`, about 78MB
+    each, unsigned.
+  - Set `build.win.icon` to `renderer/icon.png` (256px), because it had
+    been shipping the default Electron icon.
+  - Checks:
+    - `app.asar` holds HEAD's code.
+    - `wine Setup.exe /S` installs to
+      `%LOCALAPPDATA%\Programs\Pomodoro Timer` with shortcuts and an
+      uninstaller.
+    - The installed exe opens a 300x460 window under Wine.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
