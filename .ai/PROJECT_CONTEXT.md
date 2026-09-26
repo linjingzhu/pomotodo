@@ -596,6 +596,20 @@ commands → the compile and build ladder and every report; `generated` →
     `backgroundImagePath` is migrated on the first `background:get`
     while the original still exists; if it's gone, the setting is left
     alone.
+- 1.0.9: visual quality, per the user ("find and use visual skills"). No
+  UI or product-design skill exists or is installable (searched), so the
+  work used the dataviz skill (for the calendar heatmap) and `.ai/UX.md`.
+  - Heatmap: the old alpha-mixed accent ramp failed the dataviz ordinal
+    checks (level 0 to 1 ΔL 0.019; light end 1.13:1). It is now a fixed
+    OKLCH lightness ramp (0.52 / 0.65 / 0.75 / 0.86, chroma <= 0.16) in
+    the key color's hue (`--key`, which unlike `--accent` doesn't turn
+    turquoise on breaks). It passes for eight key colors, rendered in
+    Chromium and validated. Day numbers: white on step 1, ink on 2-4
+    (>= 4.5:1). A Less-to-More legend with threshold tooltips was added;
+    cell tooltips now include the date. Today keeps the orange ring; its
+    number stays orange only where readable.
+  - `--text-muted` raised from #8b8d9c (3.9:1 on the panel) to #a9abb8
+    (5.6:1).
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

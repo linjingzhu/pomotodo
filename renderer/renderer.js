@@ -143,6 +143,7 @@
   // turquoise, regardless of that setting.
   function applyModeColor() {
     document.documentElement.style.setProperty('--accent', mode === 'work' ? userAccentColor : BREAK_ACCENT_COLOR);
+    document.documentElement.style.setProperty('--key', userAccentColor);
   }
 
   function applyBackgroundBlur(px) {

@@ -1,6 +1,6 @@
 {
   "name": "pomodoro-timer",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Installable Pomodoro timer for Windows",
   "main": "main.js",
   "author": "Daniel Sword",
