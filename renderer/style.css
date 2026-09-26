@@ -104,6 +104,7 @@ html, body {
   -webkit-app-region: no-drag;
 }
 #app:hover .titlebar-actions,
+#app.pointer-inside .titlebar-actions,
 .titlebar-actions:focus-within {
   opacity: 1;
 }
@@ -144,20 +145,34 @@ html, body {
   border: none;
 }
 
+/* A size container, so the ring can shrink to whatever height is left
+   instead of pushing the stats and their Reset below the window edge. */
 main {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
+  container-type: size;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 24px;
+  gap: 14px;
+  padding: 16px 24px 22px;
+}
+
+/* Ring diameter, shared with #stats so the stats span exactly the ring's
+   width. cq units measure main's content box; 158px = the two 14px gaps
+   + 58px controls + 70px stats block, with 2px spare. Declared on both
+   children (not on main) because cq units resolve against an ancestor. */
+#timer-ring,
+#stats {
+  --ring: clamp(96px, min(100cqw, 100cqh - 158px), 190px);
 }
 
 #timer-ring {
   position: relative;
-  width: 190px;
-  height: 190px;
+  flex-shrink: 0;
+  width: var(--ring);
+  height: var(--ring);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -210,9 +225,9 @@ main {
     var(--accent) 0deg,
     oklch(from var(--accent) l c calc(h + 45) / 0.3) calc(var(--ring-end) - var(--ring-start))
   );
-  /* ring band matches the track: r=52, stroke 3 in a 120 viewBox at 190px */
+  /* ring band matches the track at any size: r=52 +/- 1.5 in a 120 viewBox */
   mask-image:
-    radial-gradient(circle, transparent 79.5px, #000 80px, #000 84.7px, transparent 85.2px),
+    radial-gradient(circle closest-side, transparent calc(84.17% - 0.5px), #000 84.17%, #000 89.17%, transparent calc(89.17% + 0.5px)),
     conic-gradient(transparent var(--ring-start), #000 var(--ring-start), #000 var(--ring-end), transparent var(--ring-end));
   mask-composite: intersect;
   transition: --ring-start 0.3s linear, --ring-end 0.6s ease-out;
@@ -247,26 +262,28 @@ main {
 /* Running totals under the controls: completed work sessions and summed
    work time, plus their own reset (separate from the timer's reset icon). */
 #stats {
-  width: 190px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 4px;
+  /* never narrower than its longest row, even when the ring gets small */
+  width: max(var(--ring), 176px);
   font-size: 12px;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-}
+/* Label on the ring's left edge, value on its right edge. */
+.stat-row { display: contents; }
 .stat-row span:first-child { color: rgba(255, 255, 255, 0.65); }
 .stat-row span:last-child {
+  text-align: right;
   color: var(--text);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 #stats-reset-btn {
-  align-self: center;
-  margin-top: 4px;
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin-top: 14px;
   padding: 3px 12px;
   font-size: 11px;
   -webkit-app-region: no-drag;
@@ -274,7 +291,7 @@ main {
 
 #timer-display {
   position: relative;
-  font-size: 32px;
+  font-size: calc(var(--ring) * 0.168);
   font-weight: 600;
   letter-spacing: 2px;
   font-variant-numeric: tabular-nums;
@@ -345,6 +362,9 @@ button.primary:hover { filter: brightness(1.12); }
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
+  /* capped so the timer above keeps most of its size; the panel scrolls */
+  flex: 0 1 auto;
+  max-height: 48%;
   -webkit-app-region: no-drag;
 }
 #settings-panel.hidden { display: none; }

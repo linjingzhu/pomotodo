@@ -360,5 +360,7 @@
     await populateDisplays();
   }
 
+  window.pomodoro.onPointerInside((inside) => el.app.classList.toggle('pointer-inside', inside));
+
   init();
 })();

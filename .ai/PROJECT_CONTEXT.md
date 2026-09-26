@@ -360,6 +360,26 @@ commands → the compile and build ladder and every report; `generated` →
   - Dropped the feature branch from the triggers.
   - Lesson: read REPOSITORY.md before adding any automation, not at merge
     time.
+- Real Windows screenshot, after the merge: the corner dots only appeared
+  over the ring, and the stats' second row and Reset were cut off below
+  the window edge.
+  - Cause of the hover bug: Windows sends no mouse events over
+    `-webkit-app-region: drag`, so CSS :hover only fired on the no-drag
+    ring. Fix: main.js polls `screen.getCursorScreenPoint()` against the
+    window bounds every 120ms and sends `window:pointer`; the renderer
+    toggles `#app.pointer-inside`.
+  - Cause of the clipping: main had a fixed content height. Fix: main is
+    now a size container. The ring is
+    `clamp(96px, min(100cqw, 100cqh - 158px), 190px)`, and the digits
+    and the ring mask scale with it (the mask now uses percentages).
+    Watch out: cq units measure the content box, so padding is not part
+    of the reserve.
+  - Stats now span the ring's width (label at its left edge, value at
+    its right edge, per the user's mockup), are at least 176px wide, and
+    have 14px above Reset. The settings panel is capped at 48% and
+    scrolls.
+  - Verified under Xvfb at 300x460, 320x380, 260x330 and with settings
+    open. xdotool hover over a drag area toggles the dots on and off.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

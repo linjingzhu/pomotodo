@@ -116,6 +116,29 @@ function createWindow() {
   });
 
   mainWindow.on('leave-full-screen', restoreAfterFullscreen);
+  trackPointer();
+}
+
+// Windows delivers no mouse events over -webkit-app-region: drag, which is
+// most of the widget, so CSS :hover only fired over the no-drag ring and
+// buttons. Poll the cursor here and tell the renderer when it's over the
+// window instead.
+function trackPointer() {
+  let inside = false;
+  const timer = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      clearInterval(timer);
+      return;
+    }
+    if (!mainWindow.isVisible()) return;
+    const { x, y } = screen.getCursorScreenPoint();
+    const b = mainWindow.getBounds();
+    const now = x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height;
+    if (now !== inside) {
+      inside = now;
+      mainWindow.webContents.send('window:pointer', inside);
+    }
+  }, 120);
 }
 
 function showWindow() {

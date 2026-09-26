@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('pomodoro', {
   resizeWindow: (width, height) => ipcRenderer.invoke('window:resize', { width, height }),
   notify: (title, body) => ipcRenderer.invoke('notify', { title, body }),
   closeNotification: () => ipcRenderer.invoke('notify:close'),
+  onPointerInside: (callback) => ipcRenderer.on('window:pointer', (_evt, inside) => callback(inside)),
   pickBackgroundImage: () => ipcRenderer.invoke('background:pick'),
   clearBackgroundImage: () => ipcRenderer.invoke('background:clear'),
   getBackgroundImage: () => ipcRenderer.invoke('background:get'),
