@@ -281,13 +281,19 @@ commands → the compile and build ladder and every report; `generated` →
   under the controls: 총 턴 (completed work sessions), 총 학습시간 (every
   work-mode second actually ticked, including abandoned sessions), and a
   초기화 button.
-  - The totals reset needs a second click within 3s.
+  - The totals reset is a single click, per the user's request. An
+    earlier version asked for a second click within 3s.
   - The timer reset no longer touches any count.
   - Totals are saved to settings.json on each phase switch, on
     pause/reset, and every 10 work seconds, so at most 10s is lost if the
     app is killed.
   - Verified across a restart under Xvfb: 2 turns / 151s saved and
     restored, then the two-click reset cleared both.
+- All UI text switched to English at the user's request: HTML labels and
+  tooltips, renderer strings (notifications, study-time format `3h 5m`),
+  tray menu, display labels, file dialog title, package description, and
+  `lang="en"`. Grep for Hangul across the app sources returns 0. Checked
+  under Xvfb: no settings or stats row overflows.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

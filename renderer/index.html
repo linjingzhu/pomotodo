@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
@@ -11,10 +11,10 @@
     <div id="bg-image"></div>
     <div id="bg-tint"></div>
     <div class="titlebar-actions">
-      <button id="close-btn" title="닫기"></button>
-      <button id="gear-btn" title="설정"></button>
-      <button id="pin-btn" title="창 크기 고정" aria-pressed="false"></button>
-      <button id="fullscreen-btn" title="전체화면"></button>
+      <button id="close-btn" title="Close"></button>
+      <button id="gear-btn" title="Settings"></button>
+      <button id="pin-btn" title="Lock window size" aria-pressed="false"></button>
+      <button id="fullscreen-btn" title="Fullscreen"></button>
     </div>
 
     <main>
@@ -27,7 +27,7 @@
         <div id="timer-display">25:00</div>
       </div>
       <div id="controls">
-        <button id="start-pause-btn" class="primary" title="시작">
+        <button id="start-pause-btn" class="primary" title="Start">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
             <path id="play-icon" d="M4 2.5 L13 8 L4 13.5 Z" />
             <g id="pause-icon">
@@ -36,7 +36,7 @@
             </g>
           </svg>
         </button>
-        <button id="reset-btn" title="초기화">
+        <button id="reset-btn" title="Reset timer">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
             <path d="M8 2.5a5.5 5.5 0 1 1 -5.2 3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
             <path d="M2.3 2.5 L2.8 6.2 L6.2 5.2 Z" />
@@ -44,74 +44,74 @@
         </button>
       </div>
       <div id="stats">
-        <div class="stat-row"><span>총 턴</span><span id="total-turns">0</span></div>
-        <div class="stat-row"><span>총 학습시간</span><span id="total-study">0분</span></div>
-        <button id="stats-reset-btn" title="총 턴·총 학습시간을 0으로">초기화</button>
+        <div class="stat-row"><span>Total turns</span><span id="total-turns">0</span></div>
+        <div class="stat-row"><span>Total study time</span><span id="total-study">0m</span></div>
+        <button id="stats-reset-btn" title="Reset total turns and study time to 0">Reset</button>
       </div>
     </main>
 
     <section id="settings-panel" class="hidden">
       <div class="row">
-        <label for="work-min">작업 시간 (분)</label>
+        <label for="work-min">Work (min)</label>
         <input type="number" id="work-min" min="1" max="180" value="25" />
       </div>
       <div class="row">
-        <label for="break-min">쉬는 시간 (분)</label>
+        <label for="break-min">Break (min)</label>
         <input type="number" id="break-min" min="1" max="60" value="5" />
       </div>
       <div class="row">
-        <label for="notify-on-phase-change">종료 시 윈도우 알림</label>
+        <label for="notify-on-phase-change">Windows notification when a session ends</label>
         <input type="checkbox" id="notify-on-phase-change" />
       </div>
       <div class="row">
-        <label for="always-top">항상 위 (Always on Top: 다른 창 위에 항상 표시)</label>
+        <label for="always-top">Always on top</label>
         <input type="checkbox" id="always-top" />
       </div>
       <div class="row">
-        <label for="minimize-to-tray">최소화 시 트레이로 보내기</label>
+        <label for="minimize-to-tray">Minimize to tray</label>
         <input type="checkbox" id="minimize-to-tray" />
       </div>
       <div class="row">
-        <label for="close-to-tray">닫기(X) 시 트레이로 보내기 (종료 안 함)</label>
+        <label for="close-to-tray">Close to tray (keeps running)</label>
         <input type="checkbox" id="close-to-tray" />
       </div>
       <hr />
       <div class="row">
-        <label for="display-select">모니터 선택</label>
+        <label for="display-select">Monitor</label>
         <select id="display-select"></select>
       </div>
       <div class="row">
-        <label>모서리에 붙이기</label>
+        <label>Snap to corner</label>
         <div id="corner-grid">
-          <button data-corner="tl" title="좌상단">↖</button>
-          <button data-corner="tr" title="우상단">↗</button>
-          <button data-corner="bl" title="좌하단">↙</button>
-          <button data-corner="br" title="우하단">↘</button>
+          <button data-corner="tl" title="Top left">↖</button>
+          <button data-corner="tr" title="Top right">↗</button>
+          <button data-corner="bl" title="Bottom left">↙</button>
+          <button data-corner="br" title="Bottom right">↘</button>
         </div>
       </div>
       <hr />
       <div class="row">
-        <label>배경 이미지 (짧은 쪽에 맞춰 채움)</label>
+        <label>Background image (fills the short side)</label>
         <div class="button-group">
-          <button id="bg-pick-btn">선택...</button>
-          <button id="bg-clear-btn">지우기</button>
+          <button id="bg-pick-btn">Choose...</button>
+          <button id="bg-clear-btn">Clear</button>
         </div>
       </div>
       <div class="row">
-        <label for="bg-blur">배경 블러</label>
+        <label for="bg-blur">Background blur</label>
         <input type="range" id="bg-blur" min="0" max="20" step="1" />
       </div>
       <div class="row">
-        <label for="bg-tint-color">배경 틴트 색상</label>
+        <label for="bg-tint-color">Tint color</label>
         <input type="color" id="bg-tint-color" />
       </div>
       <div class="row">
-        <label for="bg-tint-opacity">틴트 강도</label>
+        <label for="bg-tint-opacity">Tint strength</label>
         <input type="range" id="bg-tint-opacity" min="0" max="100" step="5" />
       </div>
       <hr />
       <div class="row">
-        <label for="accent-color">키 컬러 (작업 모드 · 휴식은 터크와즈 고정)</label>
+        <label for="accent-color">Key color (work; break is always turquoise)</label>
         <input type="color" id="accent-color" />
       </div>
     </section>

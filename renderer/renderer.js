@@ -51,7 +51,6 @@
   let totalStudySeconds = 0; // every second the timer actually ran in work mode, persisted
   let unsavedStudySeconds = 0;
   let sweepTimer = null;
-  let statsResetTimer = null;
 
   function fmt(sec) {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -69,7 +68,7 @@
     el.app.dataset.state = state;
     el.timerDisplay.textContent = fmt(remainingSec);
     el.startPauseBtn.classList.toggle('running', running);
-    el.startPauseBtn.title = running ? '일시정지' : '시작';
+    el.startPauseBtn.title = running ? 'Pause' : 'Start';
     const remainingFraction = remainingSec / currentDurationSec();
     // Negative offset (vs. positive) is what makes the depleted portion grow
     // clockwise from 12 o'clock instead of counterclockwise.
@@ -81,7 +80,7 @@
   function fmtStudy(sec) {
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
-    return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
   }
 
   function renderStats() {
@@ -139,7 +138,7 @@
 
   // A single short chime, synthesized on the fly (no bundled audio asset,
   // no autoplay-policy issues since it only ever fires after the user has
-  // already clicked "시작").
+  // already clicked Start).
   function playChime() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -166,8 +165,8 @@
     saveStats();
     remainingSec = currentDurationSec();
     applyModeColor();
-    const title = mode === 'work' ? '작업 시간' : '휴식 시간';
-    const body = mode === 'work' ? '휴식이 끝났습니다. 작업을 시작하세요.' : '작업이 끝났습니다. 잠시 쉬세요.';
+    const title = mode === 'work' ? 'Work time' : 'Break time';
+    const body = mode === 'work' ? 'Break is over. Time to focus.' : 'Work session done. Take a short break.';
     if (el.notifyOnPhaseChange.checked) {
       window.pomodoro.notify(title, body);
     }
@@ -213,26 +212,12 @@
 
   el.resetBtn.addEventListener('click', resetTimer);
 
-  // Wiping the totals is permanent, so it takes a second click within 3s.
   el.statsResetBtn.addEventListener('click', () => {
-    if (!el.statsResetBtn.classList.contains('confirming')) {
-      el.statsResetBtn.classList.add('confirming');
-      el.statsResetBtn.textContent = '한 번 더 누르면 초기화';
-      statsResetTimer = setTimeout(disarmStatsReset, 3000);
-      return;
-    }
-    disarmStatsReset();
     totalTurns = 0;
     totalStudySeconds = 0;
     saveStats();
     renderStats();
   });
-
-  function disarmStatsReset() {
-    clearTimeout(statsResetTimer);
-    el.statsResetBtn.classList.remove('confirming');
-    el.statsResetBtn.textContent = '초기화';
-  }
 
   // Changing minute inputs while stopped updates the visible countdown immediately.
   el.workMin.addEventListener('change', () => {
@@ -281,7 +266,7 @@
   // the pinned size (main applies it once fullscreen has actually ended).
   el.fullscreenBtn.addEventListener('click', async () => {
     const isFullscreen = await window.pomodoro.toggleFullscreen(pinnedSize);
-    el.fullscreenBtn.title = isFullscreen ? '창 모드' : '전체화면';
+    el.fullscreenBtn.title = isFullscreen ? 'Windowed' : 'Fullscreen';
   });
 
   el.bgPickBtn.addEventListener('click', async () => {

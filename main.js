@@ -139,10 +139,10 @@ function createTray() {
   tray.setToolTip('Pomodoro Timer');
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: '열기', click: showWindow },
+      { label: 'Open', click: showWindow },
       { type: 'separator' },
       {
-        label: '종료',
+        label: 'Quit',
         click: () => {
           app.isQuitting = true;
           app.quit();
@@ -188,7 +188,7 @@ ipcMain.handle('window:getDisplays', () => {
   const primaryId = screen.getPrimaryDisplay().id;
   return displays.map((d, idx) => ({
     id: d.id,
-    label: `모니터 ${idx + 1}${d.id === primaryId ? ' (주 모니터)' : ''} — ${d.bounds.width}x${d.bounds.height}`,
+    label: `Monitor ${idx + 1}${d.id === primaryId ? ' (primary)' : ''} — ${d.bounds.width}x${d.bounds.height}`,
     bounds: d.bounds,
   }));
 });
@@ -263,7 +263,7 @@ ipcMain.handle('notify', (_evt, { title, body }) => {
 
 ipcMain.handle('background:pick', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: '배경 이미지 선택',
+    title: 'Choose background image',
     properties: ['openFile'],
     filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
   });

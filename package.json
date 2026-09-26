@@ -1,7 +1,7 @@
 {
   "name": "pomodoro-timer",
   "version": "1.0.0",
-  "description": "설치형 Windows 뽀모도로 타이머",
+  "description": "Installable Pomodoro timer for Windows",
   "main": "main.js",
   "author": "Daniel Sword",
   "license": "UNLICENSED",
