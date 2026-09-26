@@ -13,6 +13,7 @@
     pinBtn: document.getElementById('pin-btn'),
     fullscreenBtn: document.getElementById('fullscreen-btn'),
     gearBtn: document.getElementById('gear-btn'),
+    resetSizeBtn: document.getElementById('reset-size-btn'),
     closeBtn: document.getElementById('close-btn'),
     settingsPanel: document.getElementById('settings-panel'),
     workMin: document.getElementById('work-min'),
@@ -442,6 +443,7 @@
   // Works whether or not pinned; leaving fullscreen restores the exact size
   // and position the window had before.
   el.fullscreenBtn.addEventListener('click', () => window.pomodoro.toggleFullscreen());
+  el.resetSizeBtn.addEventListener('click', () => window.pomodoro.resetSize());
   // Double-clicking the widget flips fullscreen <-> windowed, except on its
   // controls (and the panel), where a double-click means something else.
   // Over the drag region this never fires on Windows; main catches those.
@@ -500,9 +502,11 @@
   let panelOpen = false;
   el.gearBtn.addEventListener('click', async () => {
     panelOpen = !panelOpen;
-    // The window already has room for the panel, so it opens in place
-    // without resizing the window.
+    // The window grows to make room before the panel shows, and shrinks
+    // back after it hides, so the timer is never squeezed in between.
+    if (panelOpen) await window.pomodoro.setPanelOpen(true);
     el.settingsPanel.classList.toggle('hidden', !panelOpen);
+    if (!panelOpen) await window.pomodoro.setPanelOpen(false);
     window.dispatchEvent(new CustomEvent('panel-toggled', { detail: panelOpen }));
   });
 

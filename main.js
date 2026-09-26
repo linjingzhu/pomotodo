@@ -24,8 +24,8 @@ const DEFAULT_SETTINGS = {
   accentColor: '#f2405a',
   gaugeStyle: 'pie',
   currentTask: '',
-  windowWidth: 300,
-  windowHeight: 780,
+  windowWidth: 340,
+  windowHeight: 470,
   totalTurns: 0,
   totalStudySeconds: 0,
 };
@@ -77,14 +77,20 @@ let tray = null;
 
 const MIN_SIZE = { width: 180, height: 140 };
 
-// Launch size = the expanded-panel size (the largest the layout needs);
-// the panel opens inside the window instead of resizing it. Installs from
-// before this saved the old 460px launch height, so move them once.
+// Launch size = the last windowed size, else the default (340x470, the
+// compact timer; the panel grows the window while it's open, see
+// fitPanel). Installs still on an earlier default size, never resized,
+// move to this one once.
+const OLD_DEFAULT_SIZES = ['300x780', '300x460'];
+
 function initialWindowSize(settings) {
-  if (!settings.fullHeightLayout) {
-    settings.windowWidth = DEFAULT_SETTINGS.windowWidth;
-    settings.windowHeight = DEFAULT_SETTINGS.windowHeight;
-    saveSettings({ windowWidth: settings.windowWidth, windowHeight: settings.windowHeight, fullHeightLayout: true });
+  if (!settings.compactDefault) {
+    const size = `${settings.windowWidth}x${settings.windowHeight}`;
+    if (!settings.fullHeightLayout || OLD_DEFAULT_SIZES.includes(size)) {
+      settings.windowWidth = DEFAULT_SETTINGS.windowWidth;
+      settings.windowHeight = DEFAULT_SETTINGS.windowHeight;
+    }
+    saveSettings({ windowWidth: settings.windowWidth, windowHeight: settings.windowHeight, fullHeightLayout: true, compactDefault: true });
   }
   // never taller than the screen can show (e.g. 1366x768 laptops)
   const { height: maxHeight } = screen.getPrimaryDisplay().workAreaSize;
@@ -130,9 +136,10 @@ function createWindow() {
   mainWindow.on('close', (event) => {
     // persist the windowed size so next launch remembers it - never the
     // fullscreen size, which would reopen as a screen-sized window
+    // (without the height the open panel added)
     if (!isFullscreen()) {
       const [w, h] = mainWindow.getSize();
-      saveSettings({ windowWidth: w, windowHeight: h });
+      saveSettings({ windowWidth: w, windowHeight: Math.max(MIN_SIZE.height, h - (panelGrowth ? panelGrowth.dh : 0)) });
     }
     // A real quit (from the tray menu, or window-all-closed on non-mac) must
     // go through; only an interactive close (the in-app close button) can be
@@ -402,6 +409,7 @@ function exitFullscreen() {
   setTimeout(() => {
     reassertRestore();
     restoreTarget = null;
+    fitPanel(); // the panel may have been opened while fullscreen
   }, 400);
 }
 
@@ -424,6 +432,69 @@ function toggleFullscreen() {
 }
 
 ipcMain.handle('window:toggleFullscreen', () => toggleFullscreen());
+
+// The panel (Goals / Calendar / Settings) needs more height than the
+// compact default gives, so opening it grows the window to at least
+// PANEL_OPEN_HEIGHT (moving it up if the screen bottom is in the way), and
+// closing it gives that height and shift back, even if the window was
+// moved or resized meanwhile. Fullscreen already has the room; there the
+// saved windowed bounds are adjusted instead.
+const PANEL_OPEN_HEIGHT = 780;
+let panelOpen = false;
+let panelGrowth = null; // { dh, dy } while the open panel has grown the window
+
+function fitPanel() {
+  if (!panelOpen || panelGrowth || isFullscreen()) return;
+  const b = mainWindow.getBounds();
+  const area = screen.getDisplayMatching(b).workArea;
+  const height = Math.min(Math.max(b.height, PANEL_OPEN_HEIGHT), area.height);
+  const dh = Math.max(0, height - b.height);
+  const y = dh ? Math.max(area.y, Math.min(b.y, area.y + area.height - height)) : b.y;
+  panelGrowth = { dh, dy: b.y - y };
+  if (dh) withResizeUnlocked(() => mainWindow.setBounds({ x: b.x, y, width: b.width, height }));
+}
+
+function unfitPanel() {
+  const growth = panelGrowth;
+  panelGrowth = null;
+  if (!growth || (!growth.dh && !growth.dy)) return;
+  const shrink = (b) => ({ x: b.x, y: b.y + growth.dy, width: b.width, height: Math.max(MIN_SIZE.height, b.height - growth.dh) });
+  if (isFullscreen()) {
+    fullscreenBounds = shrink(fullscreenBounds);
+    return;
+  }
+  withResizeUnlocked(() => mainWindow.setBounds(shrink(mainWindow.getBounds())));
+}
+
+ipcMain.handle('window:setPanelOpen', (_evt, open) => {
+  panelOpen = !!open;
+  if (panelOpen) fitPanel();
+  else unfitPanel();
+  return panelOpen;
+});
+
+// Reset Size: back to the default size (grown again if the panel is open),
+// keeping the top-left corner where it is but on screen. It works while
+// the size is locked (it's an explicit request), and from fullscreen it
+// returns to windowed mode at the default size.
+function resetSize() {
+  const { windowWidth: width, windowHeight: height } = DEFAULT_SETTINGS;
+  panelGrowth = null;
+  if (isFullscreen()) {
+    fullscreenBounds = { ...fullscreenBounds, width, height };
+    exitFullscreen();
+  } else {
+    const b = mainWindow.getBounds();
+    const area = screen.getDisplayMatching(b).workArea;
+    const x = Math.max(area.x, Math.min(b.x, area.x + area.width - width));
+    const y = Math.max(area.y, Math.min(b.y, area.y + area.height - height));
+    withResizeUnlocked(() => mainWindow.setBounds({ x, y, width, height }));
+    fitPanel();
+  }
+  saveSettings({ windowWidth: width, windowHeight: height });
+}
+
+ipcMain.handle('window:resetSize', () => resetSize());
 
 function escapeXml(text) {
   return String(text).replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c]);
