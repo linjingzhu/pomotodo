@@ -157,7 +157,8 @@ html, body {
 #pin-btn,
 #gear-btn,
 #close-btn,
-#fullscreen-btn {
+#fullscreen-btn,
+#reset-size-btn {
   width: 10px;
   height: 10px;
   padding: 0;
@@ -170,9 +171,9 @@ html, body {
   opacity: 0.7;
   transition: opacity 0.15s ease, transform 0.1s ease, background 0.15s ease;
 }
-#pin-btn:hover, #gear-btn:hover, #close-btn:hover, #fullscreen-btn:hover { opacity: 1; }
+#pin-btn:hover, #gear-btn:hover, #close-btn:hover, #fullscreen-btn:hover, #reset-size-btn:hover { opacity: 1; }
 #close-btn:hover { background: var(--accent); }
-#pin-btn:active, #gear-btn:active, #close-btn:active, #fullscreen-btn:active { transform: scale(0.8); }
+#pin-btn:active, #gear-btn:active, #close-btn:active, #fullscreen-btn:active, #reset-size-btn:active { transform: scale(0.8); }
 
 /* Pin toggle: hollow ring when off, solid filled dot when the window size
    is locked - the one dot with real on/off state to show. */

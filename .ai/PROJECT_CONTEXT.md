@@ -560,6 +560,21 @@ commands → the compile and build ladder and every report; `generated` →
   - Verified under Xvfb by skewing the renderer's Date.now, since timing
     is wall-clock: every transition, the saved settings, and the
     setProgressBar calls.
+- 1.0.7: Reset Size, and a compact default size, per the user.
+  - The default window is 340x470, measured from the user's screenshot
+    (at 100% scale; element positions matched within 1-3px). Installs
+    still on an old default (300x780 or 300x460, never resized) move to
+    it once (`compactDefault` flag); custom sizes are kept.
+  - This replaces the 1.0.4 rule "launch size = panel-open size": the
+    user chose to grow the window when the panel opens. Opening grows it
+    to at least 780 tall (moved up if the screen bottom is in the way);
+    closing gives the height and shift back (`panelGrowth`). In
+    fullscreen, the saved windowed bounds are adjusted instead, and the
+    window fits after exit. The size saved on close excludes the growth.
+  - A fourth top-right dot, "Reset Size", returns to the default size,
+    keeping the top-left corner on screen (grown again if the panel is
+    open). It works while size-locked, and from fullscreen it returns to
+    windowed mode at the default size.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
