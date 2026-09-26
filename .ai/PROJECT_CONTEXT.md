@@ -294,6 +294,24 @@ commands → the compile and build ladder and every report; `generated` →
   tray menu, display labels, file dialog title, package description, and
   `lang="en"`. Grep for Hangul across the app sources returns 0. Checked
   under Xvfb: no settings or stats row overflows.
+- Ring: replaced the white tip dot, which the user found awkward, with a
+  color gradient along the arc. The arc is now a conic-gradient div masked
+  to the ring band. The SVG keeps only the track. Arc angles are
+  `@property` angles, so depletion and the phase-switch refill still
+  animate. The color runs from the accent at the moving end to
+  `oklch(from accent, h+45)` at 30% alpha. The glow sits on a parent
+  wrapper, because a filter on the masked element gets masked away.
+- Notifications on both phase ends stay up until user input:
+  - Windows: a toastXml with `scenario="reminder"`, which needs a button,
+    so it has a system Dismiss button.
+  - Elsewhere: `timeoutType: 'never'`.
+  - Silent, because the in-app chime is the only sound.
+  - Only one is kept at a time. It closes on toast click (which also shows
+    the window), on start/pause/reset, or when the next phase replaces it.
+  - Added `app.setAppUserModelId(appId)` on win32. It was missing, which
+    can stop toasts from showing on installed builds.
+  - The lifecycle was verified with a stubbed Notification via a
+    Module._load hook. Windows rendering is OA-12.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

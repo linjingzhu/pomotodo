@@ -178,40 +178,50 @@ main {
   stroke-width: 3;
 }
 
-#ring-progress {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-dasharray: 326.7256;
-  stroke-dashoffset: 0;
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 75%, transparent));
-  transition: stroke-dashoffset 0.3s linear, stroke 0.3s ease, opacity 0.3s ease;
+/* Progress arc: a conic gradient masked to the ring's shape, so the color
+   can run along the arc - an SVG stroke can't. The moving end (the current
+   moment) is the full key color; toward the fixed 12 o'clock end it drifts
+   to a neighbouring hue and fades. Angles are registered properties so the
+   depletion still animates smoothly. The glow sits on the parent because a
+   filter on the masked element itself would be masked away. */
+@property --ring-start {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@property --ring-end {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 360deg;
 }
 
-/* Bright dot riding the moving end of the arc. Rotated (not moved via cx/cy)
-   so a transition follows the circle instead of cutting across it. */
-#ring-tip {
-  fill: #fff;
-  transform-origin: 60px 60px;
-  filter: drop-shadow(0 0 4px var(--accent));
-  transition: transform 0.3s linear, opacity 0.2s ease;
+#ring-glow {
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 70%, transparent));
+  transition: opacity 0.3s ease;
 }
 
-/* Phase switch: the ring refills clockwise from 12 in the new mode's color. */
-#timer-ring.sweeping #ring-progress {
-  transition: stroke-dashoffset 0.6s ease-out, stroke 0.3s ease, opacity 0.3s ease;
-}
-#timer-ring.sweeping #ring-tip {
-  opacity: 0;
-  transition: none;
+#ring-fill {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(
+    from var(--ring-start),
+    var(--accent) 0deg,
+    oklch(from var(--accent) l c calc(h + 45) / 0.3) calc(var(--ring-end) - var(--ring-start))
+  );
+  /* ring band matches the track: r=52, stroke 3 in a 120 viewBox at 190px */
+  mask-image:
+    radial-gradient(circle, transparent 79.5px, #000 80px, #000 84.7px, transparent 85.2px),
+    conic-gradient(transparent var(--ring-start), #000 var(--ring-start), #000 var(--ring-end), transparent var(--ring-end));
+  mask-composite: intersect;
+  transition: --ring-start 0.3s linear, --ring-end 0.6s ease-out;
 }
 
 /* Three timer states, set as data-state on #app. Color means "the timer is
    live"; motion is reserved for paused, the one state that wants the user
    back - running stays calm so it never pulls focus from the work. */
-#app[data-state="idle"] #ring-progress { opacity: 0; }
-#app[data-state="idle"] #ring-tip { opacity: 0; }
+#app[data-state="idle"] #ring-glow { opacity: 0; }
 #app[data-state="idle"] #timer-display { opacity: 0.7; }
 #app[data-state="idle"] #start-pause-btn {
   background: var(--glass-bg-strong);
@@ -222,8 +232,7 @@ main {
   filter: none;
 }
 
-#app[data-state="paused"] #ring-progress { opacity: 0.4; filter: none; }
-#app[data-state="paused"] #ring-tip { opacity: 0.6; filter: none; }
+#app[data-state="paused"] #ring-glow { opacity: 0.4; filter: none; }
 #app[data-state="paused"] #timer-display {
   animation: paused-blink 2s ease-in-out infinite;
 }

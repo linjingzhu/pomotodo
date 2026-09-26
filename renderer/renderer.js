@@ -1,8 +1,6 @@
 (() => {
   const el = {
     app: document.getElementById('app'),
-    timerRing: document.getElementById('timer-ring'),
-    ringTip: document.getElementById('ring-tip'),
     totalTurns: document.getElementById('total-turns'),
     totalStudy: document.getElementById('total-study'),
     statsResetBtn: document.getElementById('stats-reset-btn'),
@@ -22,7 +20,7 @@
     closeToTray: document.getElementById('close-to-tray'),
     displaySelect: document.getElementById('display-select'),
     cornerButtons: Array.from(document.querySelectorAll('#corner-grid button')),
-    ringProgress: document.getElementById('ring-progress'),
+    ringFill: document.getElementById('ring-fill'),
     bgImage: document.getElementById('bg-image'),
     bgTint: document.getElementById('bg-tint'),
     bgPickBtn: document.getElementById('bg-pick-btn'),
@@ -33,9 +31,6 @@
     accentColor: document.getElementById('accent-color'),
   };
 
-  const RING_RADIUS = 52;
-  const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-  el.ringProgress.style.strokeDasharray = String(RING_CIRCUMFERENCE);
 
   const COLLAPSED_SIZE = { width: 300, height: 460 };
   const EXPANDED_SIZE = { width: 300, height: 780 };
@@ -50,7 +45,6 @@
   let totalTurns = 0; // completed work sessions, persisted
   let totalStudySeconds = 0; // every second the timer actually ran in work mode, persisted
   let unsavedStudySeconds = 0;
-  let sweepTimer = null;
 
   function fmt(sec) {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -70,10 +64,9 @@
     el.startPauseBtn.classList.toggle('running', running);
     el.startPauseBtn.title = running ? 'Pause' : 'Start';
     const remainingFraction = remainingSec / currentDurationSec();
-    // Negative offset (vs. positive) is what makes the depleted portion grow
-    // clockwise from 12 o'clock instead of counterclockwise.
-    el.ringProgress.style.strokeDashoffset = String(-RING_CIRCUMFERENCE * (1 - remainingFraction));
-    el.ringTip.style.transform = `rotate(${360 * (1 - remainingFraction)}deg)`;
+    // The arc spans [start, 360deg]; start advancing clockwise from 12
+    // o'clock is the depleted portion growing clockwise.
+    el.ringFill.style.setProperty('--ring-start', `${360 * (1 - remainingFraction)}deg`);
     renderStats();
   }
 
@@ -93,16 +86,16 @@
     window.pomodoro.saveSettings({ totalTurns, totalStudySeconds });
   }
 
-  // Jump the arc to empty-but-positioned-to-grow-clockwise without animating,
-  // so the render() that follows refills it clockwise from 12 o'clock.
+  // Collapse the arc to nothing at 12 o'clock without animating, then let
+  // its end transition back to 360deg: a clockwise refill from 12.
   function playPhaseSweep() {
-    el.timerRing.classList.add('sweeping');
-    el.ringProgress.style.transition = 'none';
-    el.ringProgress.style.strokeDashoffset = String(RING_CIRCUMFERENCE);
-    el.ringProgress.getBoundingClientRect();
-    el.ringProgress.style.transition = '';
-    clearTimeout(sweepTimer);
-    sweepTimer = setTimeout(() => el.timerRing.classList.remove('sweeping'), 650);
+    const fill = el.ringFill;
+    fill.style.transition = 'none';
+    fill.style.setProperty('--ring-start', '0deg');
+    fill.style.setProperty('--ring-end', '0deg');
+    getComputedStyle(fill).getPropertyValue('--ring-end');
+    fill.style.transition = '';
+    fill.style.setProperty('--ring-end', '360deg');
   }
 
   // Work mode uses the user's chosen key color; break mode is always
@@ -165,8 +158,9 @@
     saveStats();
     remainingSec = currentDurationSec();
     applyModeColor();
-    const title = mode === 'work' ? 'Work time' : 'Break time';
-    const body = mode === 'work' ? 'Break is over. Time to focus.' : 'Work session done. Take a short break.';
+    // `mode` is already the phase that's starting.
+    const title = mode === 'work' ? 'Break is over' : 'Focus time is over';
+    const body = mode === 'work' ? 'Time to focus.' : 'Take a short break.';
     if (el.notifyOnPhaseChange.checked) {
       window.pomodoro.notify(title, body);
     }
@@ -206,11 +200,15 @@
   }
 
   el.startPauseBtn.addEventListener('click', () => {
+    window.pomodoro.closeNotification();
     if (running) stopTick();
     else startTick();
   });
 
-  el.resetBtn.addEventListener('click', resetTimer);
+  el.resetBtn.addEventListener('click', () => {
+    window.pomodoro.closeNotification();
+    resetTimer();
+  });
 
   el.statsResetBtn.addEventListener('click', () => {
     totalTurns = 0;

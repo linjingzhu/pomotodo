@@ -255,11 +255,53 @@ ipcMain.handle('window:toggleFullscreen', (_evt, restoreSize) => {
   return entering;
 });
 
+function escapeXml(text) {
+  return String(text).replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c]);
+}
+
+// Windows only keeps a toast on screen until the user acts on it in the
+// "reminder" scenario, and only when it has at least one button. Silent
+// because the renderer already plays its own chime.
+function persistentToastXml(title, body) {
+  return '<toast scenario="reminder">'
+    + `<visual><binding template="ToastGeneric"><text>${escapeXml(title)}</text><text>${escapeXml(body)}</text></binding></visual>`
+    + '<actions><action content="Dismiss" arguments="dismiss" activationType="system"/></actions>'
+    + '<audio silent="true"/>'
+    + '</toast>';
+}
+
+// One phase-end notification at a time: it stays up until the user
+// dismisses it, clicks it, or acts on the timer in the app.
+let phaseNotification = null;
+
+function closePhaseNotification() {
+  if (!phaseNotification) return;
+  phaseNotification.close();
+  phaseNotification = null;
+}
+
 ipcMain.handle('notify', (_evt, { title, body }) => {
-  if (Notification.isSupported()) {
-    new Notification({ title, body }).show();
-  }
+  if (!Notification.isSupported()) return;
+  closePhaseNotification();
+  const notification = new Notification({
+    title,
+    body,
+    silent: true,
+    timeoutType: 'never',
+    ...(process.platform === 'win32' ? { toastXml: persistentToastXml(title, body) } : {}),
+  });
+  notification.on('click', () => {
+    showWindow();
+    notification.close();
+  });
+  notification.on('close', () => {
+    if (phaseNotification === notification) phaseNotification = null;
+  });
+  phaseNotification = notification;
+  notification.show();
 });
+
+ipcMain.handle('notify:close', () => closePhaseNotification());
 
 ipcMain.handle('background:pick', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -293,6 +335,10 @@ ipcMain.handle('background:get', () => {
     return null;
   }
 });
+
+// Without an explicit AppUserModelID, Windows attributes (and may drop)
+// toasts; it must match the installer's appId.
+if (process.platform === 'win32') app.setAppUserModelId('com.danielsword.pomodorotimer');
 
 app.whenReady().then(() => {
   createWindow();
