@@ -18,25 +18,6 @@ Release로 올립니다. 공개 저장소에서는 일반 러너 기준으로 Ac
 - 실행 시간 상한 설정
 - 과금되는 워크플로 아티팩트는 저장하지 않음
 
-## 구글 캘린더 연결 (최초 1회)
-
-앱이 구글에 접속하려면 본인 구글 계정으로 만든 OAuth 클라이언트가 필요합니다.
-
-1. https://console.cloud.google.com 에서 프로젝트를 만듭니다.
-2. **APIs & Services → Library**에서 **Google Calendar API**를 사용 설정합니다.
-3. **OAuth consent screen**(Google Auth Platform)에서 앱 이름을 정하고,
-   User type은 External을 고르고, 본인 이메일을 Test user로 추가합니다.
-   - Testing 상태로 두면 로그인이 7일마다 만료됩니다. 계속 쓰려면
-     **Publish app**으로 In production 상태로 바꾸세요. 검증되지 않은 앱이라
-     로그인할 때 경고 화면이 뜨는데, "고급 → 이동"으로 진행하면 됩니다.
-4. **Credentials → Create credentials → OAuth client ID**에서 Application type을
-   **Desktop app**으로 만듭니다.
-5. 앱의 Settings 탭 → Google Calendar에 Client ID와 Client secret을 붙여 넣고
-   **Connect**를 누른 뒤, 열리는 브라우저에서 로그인하고 허용합니다.
-
-연결을 끊으려면 **Disconnect**를 누르면 됩니다. 이때 구글 권한도 함께
-취소됩니다.
-
 ## 빌드 방법 (최초 1회, 인터넷 필요)
 
 1. `build.bat` 더블클릭
@@ -99,17 +80,13 @@ npm start
     기록에 영향 없음
 - 앱 화면의 모든 글자(설정 항목, 툴팁, 트레이 메뉴, Windows 알림)는 영어
 - **지금 하는 일 기록**: 조작 버튼 아래 "What are you working on?" 칸에 적어 두면
-  집중 세션이 끝날 때 시작·종료 시각, 실제 공부한 시간과 함께 저장됨 (1분 이상
-  하다가 초기화한 세션도 "stopped early"로 저장)
+  집중 세션이 끝날 때 시작·종료 시각, 실제 공부한 시간과 함께 PC에 저장됨 (1분
+  이상 하다가 초기화한 세션도 "stopped early"로 저장)
 - **패널 (두 번째 점)**: Goals · Calendar · Settings 세 탭
   - Goals: 목표를 추가하고, 달성하면 체크(달성일 기록), 필요 없으면 삭제
   - Calendar: 월 달력에 날마다 공부량을 색 농도로 표시하고 목표 달성일에 ✓
     표시. 날짜를 누르면 그날의 세션 목록과 달성한 목표가 나오고, 세션 메모는
-    나중에 고칠 수 있음
-- **구글 캘린더 동기화** (Settings 탭 → Google Calendar): 집중 세션은 일정으로,
-  달성한 목표는 그날의 종일 일정으로 전용 캘린더 "Pomodoro Timer"에 올라감.
-  앱은 자기가 만든 이 캘린더에만 접근하고 기존 일정은 보지도 바꾸지도 않음.
-  오프라인일 때 쌓인 기록은 다음 동기화 때 올라감
+    나중에 고칠 수 있음. 기록은 이 PC에만 저장되고 외부 캘린더와 연결하지 않음
 - 모니터 선택 후 좌상/우상/좌하/우하 4개 모서리로 창 붙이기
 - 집중 시간·휴식 시간이 끝날 때마다 Windows 알림 + 알림음 1회, 작업↔휴식
   자동 전환. 알림은 자동으로 사라지지 않고, 사용자가 알림의 Dismiss 버튼이나

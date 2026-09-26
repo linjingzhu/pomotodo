@@ -1,6 +1,6 @@
 {
   "name": "pomodoro-timer",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Installable Pomodoro timer for Windows",
   "main": "main.js",
   "author": "Daniel Sword",
@@ -9,7 +9,8 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "icons": "electron scripts/make-icons.js"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -22,7 +23,6 @@
       "main.js",
       "preload.js",
       "store.js",
-      "gcal.js",
       "renderer/**/*",
       "package.json"
     ],
@@ -30,7 +30,7 @@
       "output": "dist"
     },
     "win": {
-      "icon": "renderer/icon.png",
+      "icon": "build/icon.ico",
       "target": [
         { "target": "portable", "arch": ["x64"] }
       ]

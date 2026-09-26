@@ -36,25 +36,6 @@ test('goals: add, reach, un-reach, order, delete', () => {
   assert.deepStrictEqual(store.listGoals(file).map((g) => g.id), [a.id]);
 });
 
-test('pending sync covers unsynced sessions and reached goals only', () => {
-  const file = tempFile();
-  const s1 = store.addSession(file, { start: new Date().toISOString(), end: new Date().toISOString(), workedSec: 60, note: '', completed: false });
-  store.addSession(file, { start: new Date().toISOString(), end: new Date().toISOString(), workedSec: 60, note: '', completed: true });
-  const open = store.addGoal(file, 'open');
-  const reached = store.addGoal(file, 'reached');
-  store.setGoalDone(file, reached.id, true);
-  store.updateSession(file, s1.id, { gcalEventId: 'evt1' });
-
-  let pending = store.pendingSync(file);
-  assert.strictEqual(pending.sessions.length, 1);
-  assert.deepStrictEqual(pending.goals.map((g) => g.id), [reached.id]);
-  assert.ok(!pending.goals.some((g) => g.id === open.id));
-
-  store.clearEventIds(file);
-  pending = store.pendingSync(file);
-  assert.strictEqual(pending.sessions.length, 2);
-});
-
 test('a missing or corrupt file reads as empty', () => {
   const file = tempFile();
   assert.deepStrictEqual(store.load(file), { sessions: [], goals: [] });

@@ -33,7 +33,7 @@ runtime_gate: none
 test_command: npm test
 lint_command: none
 build_command: npm run dist
-generated: none
+generated: build/icon.ico, renderer/icon.png, renderer/tray-icon.png, renderer/tray-icon@2x.png (from assets/pomodoro-app-icon.svg via `npm run icons`; add --no-sandbox when running as root)
 external_scripts: none
 public_ids: none
 owner_ledger: docs/OWNER_ACTIONS.md
@@ -422,6 +422,40 @@ commands → the compile and build ladder and every report; `generated` →
   - The portable build contains the new files and runs under Wine.
   - No product-design skill exists for this user (listed and searched);
     `.ai/UX.md` was used instead.
+- Panel height is now fixed at 48% of #app for every tab (`flex: 0 0 48%`),
+  per the user, so switching tabs never moves the timer. Goals may leave
+  empty space; Calendar and Settings scroll. It measured 371px on all
+  three tabs under Xvfb. Also added a thin translucent scrollbar and
+  bumped the version to 1.0.2.
+- Panel tabs, per the user: plain text, no background and no underline. The
+  active tab is only in the key color (`var(--accent)`, turquoise during
+  breaks).
+- The panel no longer scrolls as a whole. The tab bar is fixed and only
+  the `.tab` body scrolls, with 32px bottom padding so the last row clears
+  the rounded corners. Earlier, the sticky bar's 90%-opaque background let
+  rows sliding under it show through. (First misread as a sticky-offset
+  bug; measuring disproved that.)
+- App icon, per the user: the owner uploaded `pomodoro-app-icon.svg` to
+  stable (the SVG chat attachment was rejected). It was reviewed (no
+  scripts or external refs) and moved to `assets/`.
+  - `scripts/make-icons.js` (`npm run icons`) rasterizes the SVG separately
+    at each size in offscreen Chromium, with alpha. It writes a 7-size
+    PNG-entry `build/icon.ico` (the exe icon), the 256px window icon, and
+    tray 16px plus @2x 32px.
+  - `win.icon` now points to build/icon.ico.
+  - The tray loads tray-icon.png, and nativeImage picks up @2x (scale
+    factors [1,2]). Before, it was a 256px icon resized to 16.
+  - The `wrestool` extract of the built exe shows all 7 sizes.
+- Google Calendar sync removed, per the user (no external calendar
+  connection): gcal.js, its tests, gcal IPC and preload methods, the
+  Settings > Google Calendar section, and `gcalEventId` bookkeeping in
+  store.js (setGoalEvent, pendingSync, clearEventIds).
+  - The user first said to drop the Calendar tab too, then reversed that
+    mid-edit. The in-app Calendar tab stays: month grid, day list, note
+    editing, all local.
+  - OA-15 is marked not applicable.
+  - Existing users' google-calendar.json in userData is left alone
+    (harmless).
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

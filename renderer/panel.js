@@ -1,5 +1,5 @@
-// The expandable panel: Goals, Calendar (daily history) and Settings tabs,
-// plus the Google Calendar connection controls inside Settings.
+// The expandable panel: Goals, Calendar (daily history, kept on this PC
+// only) and Settings tabs.
 (() => {
   const $ = (id) => document.getElementById(id);
   const api = window.pomodoro;
@@ -171,42 +171,4 @@
   window.addEventListener('session-recorded', () => {
     if (activeTab === 'calendar') loadMonth();
   });
-
-  // ---- Google Calendar ----
-
-  function renderGcal(status) {
-    const text = $('gcal-status');
-    let message;
-    if (status.error) message = status.error;
-    else if (status.connecting) message = 'Finish signing in in your browser…';
-    else if (status.connected) {
-      message = `Connected. Focus sessions and reached goals sync to the "${status.calendarName}" calendar.`;
-      if (status.lastSyncAt) message += ` Last synced ${clock(status.lastSyncAt)}.`;
-      if (!status.persistent) message += ' This system can\'t store the sign-in securely, so you\'ll need to connect again after restarting.';
-    } else if (status.configured) message = 'Not connected. Click Connect to sign in with Google.';
-    else message = 'Not set up yet. Follow the steps below.';
-    text.textContent = message;
-    text.classList.toggle('error', !!status.error);
-
-    $('gcal-setup').classList.toggle('hidden', status.connected);
-    if (document.activeElement !== $('gcal-client-id')) $('gcal-client-id').value = status.clientId;
-    $('gcal-client-secret').placeholder = status.configured ? 'saved' : '';
-    $('gcal-connect-btn').classList.toggle('hidden', status.connected);
-    $('gcal-connect-btn').disabled = status.connecting;
-    $('gcal-sync-btn').classList.toggle('hidden', !status.connected);
-    $('gcal-disconnect-btn').classList.toggle('hidden', !status.connected);
-  }
-
-  $('gcal-connect-btn').addEventListener('click', async () => {
-    const clientId = $('gcal-client-id').value.trim();
-    const clientSecret = $('gcal-client-secret').value.trim();
-    if (clientId || clientSecret) renderGcal(await api.saveGcalClient(clientId, clientSecret));
-    $('gcal-client-secret').value = '';
-    renderGcal(await api.connectGcal());
-  });
-  $('gcal-sync-btn').addEventListener('click', async () => renderGcal(await api.syncGcalNow()));
-  $('gcal-disconnect-btn').addEventListener('click', async () => renderGcal(await api.disconnectGcal()));
-
-  api.onGcalStatus(renderGcal);
-  api.getGcalStatus().then(renderGcal);
 })();

@@ -47,7 +47,6 @@ function addSession(file, { start, end, workedSec, note, completed }) {
     workedSec: Math.max(0, Math.round(workedSec)),
     note: String(note || '').slice(0, 500),
     completed: !!completed,
-    gcalEventId: null,
   };
   update(file, (data) => data.sessions.push(session));
   return session;
@@ -58,7 +57,6 @@ function updateSession(file, id, patch) {
     const session = data.sessions.find((s) => s.id === id);
     if (!session) return null;
     if ('note' in patch) session.note = String(patch.note || '').slice(0, 500);
-    if ('gcalEventId' in patch) session.gcalEventId = patch.gcalEventId;
     return { ...session };
   });
 }
@@ -84,7 +82,7 @@ function listGoals(file) {
 function addGoal(file, title) {
   const text = String(title || '').trim().slice(0, 200);
   if (!text) return null;
-  const goal = { id: crypto.randomUUID(), title: text, createdAt: new Date().toISOString(), doneAt: null, gcalEventId: null };
+  const goal = { id: crypto.randomUUID(), title: text, createdAt: new Date().toISOString(), doneAt: null };
   update(file, (data) => data.goals.push(goal));
   return goal;
 }
@@ -98,35 +96,10 @@ function setGoalDone(file, id, done) {
   });
 }
 
-function setGoalEvent(file, id, gcalEventId) {
-  return update(file, (data) => {
-    const goal = data.goals.find((g) => g.id === id);
-    if (goal) goal.gcalEventId = gcalEventId;
-    return goal ? { ...goal } : null;
-  });
-}
-
 function deleteGoal(file, id) {
   return update(file, (data) => {
     const i = data.goals.findIndex((g) => g.id === id);
     return i === -1 ? null : data.goals.splice(i, 1)[0];
-  });
-}
-
-// Everything Google Calendar should hold but doesn't yet.
-function pendingSync(file) {
-  const data = load(file);
-  return {
-    sessions: data.sessions.filter((s) => !s.gcalEventId),
-    goals: data.goals.filter((g) => g.doneAt && !g.gcalEventId),
-  };
-}
-
-// After the target calendar is recreated, every stored event id is stale.
-function clearEventIds(file) {
-  update(file, (data) => {
-    data.sessions.forEach((s) => { s.gcalEventId = null; });
-    data.goals.forEach((g) => { g.gcalEventId = null; });
   });
 }
 
@@ -139,8 +112,5 @@ module.exports = {
   listGoals,
   addGoal,
   setGoalDone,
-  setGoalEvent,
   deleteGoal,
-  pendingSync,
-  clearEventIds,
 };

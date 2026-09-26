@@ -352,7 +352,7 @@ button:active { transform: scale(0.96); }
    background image. It shares #app's rounded clipping, so it needs no
    border-radius of its own. */
 #settings-panel {
-  padding: 12px 14px 16px;
+  padding: 12px 14px 0;
   background: linear-gradient(160deg, rgba(10, 10, 16, 0.62), rgba(10, 10, 16, 0.5));
   backdrop-filter: blur(var(--glass-blur)) saturate(140%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
@@ -361,10 +361,11 @@ button:active { transform: scale(0.96); }
   display: flex;
   flex-direction: column;
   gap: 8px;
-  overflow-y: auto;
-  /* capped so the timer above keeps most of its size; the panel scrolls */
-  flex: 0 1 auto;
-  max-height: 48%;
+  overflow: hidden;
+  /* One fixed height for every tab, so switching tabs never moves the timer
+     above; short tabs leave space at the bottom, long ones scroll. */
+  flex: 0 0 48%;
+  min-height: 0;
   -webkit-app-region: no-drag;
 }
 #settings-panel.hidden { display: none; }
@@ -471,8 +472,7 @@ select {
   border-bottom-color: var(--accent);
 }
 
-input[type="text"],
-input[type="password"] {
+input[type="text"] {
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   color: var(--text);
@@ -482,8 +482,6 @@ input[type="password"] {
   font-size: 12px;
   min-width: 0;
 }
-#settings-panel .row input[type="text"],
-#settings-panel .row input[type="password"] { width: 150px; }
 
 .hint {
   margin: 0;
@@ -492,36 +490,51 @@ input[type="password"] {
   line-height: 1.45;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
-.hint.error { color: #ff8a8a; }
-.section-title {
-  font-weight: 600;
-  font-size: 12px;
-}
 
-/* Tabs stay visible while the panel scrolls. */
+/* The tab bar stays put and only the tab body below it scrolls, so rows
+   never slide behind the bar and it needs no background of its own. */
 #panel-tabs {
-  position: sticky;
-  top: -12px;
-  z-index: 1;
+  flex-shrink: 0;
   display: flex;
   gap: 6px;
-  margin: -12px -14px 4px;
-  padding: 10px 14px 8px;
-  background: rgba(14, 14, 20, 0.9);
+  margin: -4px 0 0;
 }
+/* Plain text tabs: no background, no underline; the active one is simply
+   in the key color. */
 #panel-tabs button {
   flex: 1;
   padding: 4px 0;
   font-size: 12px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
 }
+#panel-tabs button:hover {
+  background: none;
+  color: var(--text);
+}
+#panel-tabs button:active { transform: none; }
 #panel-tabs button[aria-selected="true"] {
-  background: rgba(255, 255, 255, 0.28);
+  color: var(--accent);
   font-weight: 600;
 }
+/* The scrolling body. The large bottom padding keeps the last row clear
+   of the widget's rounded bottom corners when scrolled to the end; the
+   right padding leaves room for the scrollbar. */
 .tab {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-right: -10px;
+  padding: 0 10px 32px 0;
 }
 
 /* Goals */
@@ -639,3 +652,12 @@ input[type="password"] {
 }
 .session-note { width: 100%; }
 .goal-reached { color: #40e0d0; }
+
+/* Thin, translucent scrollbar so the dark panel doesn't get a white bar. */
+.tab::-webkit-scrollbar { width: 6px; }
+.tab::-webkit-scrollbar-track { background: transparent; }
+.tab::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+}
+.tab::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
