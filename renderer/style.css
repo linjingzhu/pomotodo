@@ -126,28 +126,39 @@ html, body {
 #close-btn:hover { background: var(--accent); }
 #pin-btn:active, #gear-btn:active, #close-btn:active { transform: scale(0.88); }
 
-#pin-btn svg circle,
-#gear-btn svg circle,
-#close-btn svg circle {
-  fill: white;
+/* Distinct shapes per button (X close / square settings / circle pin),
+   same shared weight: dim until hovered, full white on hover. The window
+   is transparent, so whatever's behind these icons on the real desktop is
+   unknown - a dark drop-shadow keeps white-on-white legible without
+   hurting contrast on a dark background too. */
+.titlebar-actions svg {
   opacity: 0.6;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  transition: opacity 0.15s ease;
 }
-#pin-btn:hover svg circle,
-#gear-btn:hover svg circle,
-#close-btn:hover svg circle {
+#pin-btn:hover svg, #gear-btn:hover svg, #close-btn:hover svg {
   opacity: 1;
 }
 
-/* Pin toggle overrides the shared dot style: hollow (stroke-only) when
-   off, solid (filled) when the window size is locked - the one dot with
-   real on/off state to show. */
+#close-btn svg path {
+  fill: none;
+  stroke: white;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+#gear-btn svg rect {
+  fill: white;
+}
+
+/* Pin toggle: hollow (stroke-only) when off, solid (filled) when the
+   window size is locked - the one dot with real on/off state to show. */
 #pin-btn svg circle {
   fill: none;
   stroke: white;
   stroke-width: 2;
-  opacity: 1;
   transition: fill 0.15s ease, stroke 0.15s ease;
 }
+#pin-btn svg { opacity: 1; }
 #pin-btn[aria-pressed="true"] svg circle {
   fill: white;
   stroke: none;

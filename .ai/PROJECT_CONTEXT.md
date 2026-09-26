@@ -93,11 +93,12 @@ commands → the compile and build ladder and every report; `generated` →
   rounded div be the whole shape, window edges included — the area outside
   it is genuinely transparent to the desktop. The pin/gear/close cluster is
   `position: absolute`, `opacity: 0` by default, revealed only on
-  `#app:hover`, so the idle widget stays clean. The three buttons are plain
-  dots (an inline SVG circle each, no icon glyph) identified only by their
-  native `title=` tooltip; pin is the one dot with real state, so it alone
-  overrides the shared style to go hollow (unlocked) or solid white
-  (locked). No text mode-label — the ring's own color (key color for work,
+  `#app:hover`, so the idle widget stays clean. Top to bottom: close (✕, an
+  inline SVG path), settings (□, a rounded rect), pin (○, a circle — the
+  one with real state, hollow unlocked / solid white locked); each still
+  carries a native `title=` tooltip. A `drop-shadow` on the whole icon
+  keeps them legible regardless of what's behind the transparent window.
+  No text mode-label — the ring's own color (key color for work,
   fixed turquoise for break) is the only mode indicator now.
 - `package.json` — `electron-builder` config targets `nsis` (installer) and
   `portable` for `win`/`x64`.
@@ -211,6 +212,16 @@ commands → the compile and build ladder and every report; `generated` →
   existing inline-SVG-circle approach, extended to gear/close) identified
   only by their `title=` tooltip, per a follow-up request in the same
   batch.
+- Reordered the top-right cluster to close/settings/pin (top to bottom)
+  and gave close and settings distinct shapes again (✕ path, □ rounded
+  rect) instead of uniform dots, per a follow-up request — only pin stays
+  a circle, since it's the one with actual on/off state. Added a
+  `drop-shadow` filter to the cluster's icons: a verification screenshot
+  in this plain-background test environment showed them nearly invisible
+  (white-on-white), confirmed via computed-style checks to be a contrast
+  issue rather than a rendering bug, then fixed with the shadow rather than
+  changing the icon color outright (since the transparent window's real
+  background is unknown either way).
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
