@@ -258,6 +258,25 @@ commands → the compile and build ladder and every report; `generated` →
   Resize, snap and saving size on close are all ignored while fullscreen.
   Verified under Xvfb, both pinned and unpinned: fullscreen, then settings
   open/close, then exit returns 420x340. Real Windows is OA-9.
+- Timer states made distinct, set as `data-state` on #app
+  (idle/running/paused):
+  - idle: no color, empty ring, dim digits, glass start button.
+  - running: accent ring with glow, plus a tip dot that rotates with the
+    arc end.
+  - paused: ring at 40% with no glow, digits blink slowly (static under
+    prefers-reduced-motion).
+  - Phase switch: the ring refills clockwise in the new color (dashoffset
+    jumps to +C, then transitions to 0).
+- Streak: 4 dots under the digits count consecutive completed work
+  sessions per set of four, with "xN" for full sets. The reset button
+  zeroes the streak only in work mode.
+- Verified under Xvfb by speeding up the renderer's setInterval from the
+  test harness (no app code changed for the test).
+- Found while screenshotting: #app's `0 12px 40px` outer shadow overflowed
+  the 3px window margin. It was cut off at the window edge, leaving a
+  hard-edged shadow rectangle (alpha 78 at the bottom edge), which is a
+  second contributor to the user's "box". Shrunk it to `0 1px 2px`; the
+  edge alpha is now 0-4.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

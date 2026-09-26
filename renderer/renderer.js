@@ -1,5 +1,11 @@
 (() => {
   const el = {
+    app: document.getElementById('app'),
+    timerRing: document.getElementById('timer-ring'),
+    ringTip: document.getElementById('ring-tip'),
+    streak: document.getElementById('streak'),
+    streakDots: Array.from(document.querySelectorAll('.streak-dot')),
+    streakCycles: document.getElementById('streak-cycles'),
     timerDisplay: document.getElementById('timer-display'),
     startPauseBtn: document.getElementById('start-pause-btn'),
     resetBtn: document.getElementById('reset-btn'),
@@ -41,6 +47,9 @@
   let userAccentColor = '#f2405a';
   let pinnedSize = null; // set while the window size is locked; restored when settings close
   const BREAK_ACCENT_COLOR = '#40e0d0'; // turquoise
+  const STREAK_CYCLE = 4;
+  let completedWorkSessions = 0; // consecutive; abandoning a work session (reset) breaks it
+  let sweepTimer = null;
 
   function fmt(sec) {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -48,7 +57,14 @@
     return `${m}:${s}`;
   }
 
+  function timerState() {
+    if (running) return 'running';
+    return remainingSec === currentDurationSec() ? 'idle' : 'paused';
+  }
+
   function render() {
+    const state = timerState();
+    el.app.dataset.state = state;
     el.timerDisplay.textContent = fmt(remainingSec);
     el.startPauseBtn.classList.toggle('running', running);
     el.startPauseBtn.title = running ? '일시정지' : '시작';
@@ -56,6 +72,38 @@
     // Negative offset (vs. positive) is what makes the depleted portion grow
     // clockwise from 12 o'clock instead of counterclockwise.
     el.ringProgress.style.strokeDashoffset = String(-RING_CIRCUMFERENCE * (1 - remainingFraction));
+    el.ringTip.style.transform = `rotate(${360 * (1 - remainingFraction)}deg)`;
+    renderStreak(state);
+  }
+
+  // Dots show the current set of four; a "xN" suffix counts full sets. Right
+  // after the 4th session the break keeps all four lit instead of wrapping to
+  // an empty row the moment it's earned.
+  function renderStreak(state) {
+    const n = completedWorkSessions;
+    const setJustFilled = mode === 'break' && n > 0 && n % STREAK_CYCLE === 0;
+    const filled = setJustFilled ? STREAK_CYCLE : n % STREAK_CYCLE;
+    const sets = Math.floor(n / STREAK_CYCLE) - (setJustFilled ? 1 : 0);
+    el.streakDots.forEach((dot, i) => {
+      dot.classList.toggle('done', i < filled);
+      dot.classList.toggle('current', mode === 'work' && state !== 'idle' && i === filled);
+    });
+    el.streakCycles.textContent = sets > 0 ? `×${sets}` : '';
+    const label = `연속 ${n}회 완료`;
+    el.streak.title = label;
+    el.streak.setAttribute('aria-label', label);
+  }
+
+  // Jump the arc to empty-but-positioned-to-grow-clockwise without animating,
+  // so the render() that follows refills it clockwise from 12 o'clock.
+  function playPhaseSweep() {
+    el.timerRing.classList.add('sweeping');
+    el.ringProgress.style.transition = 'none';
+    el.ringProgress.style.strokeDashoffset = String(RING_CIRCUMFERENCE);
+    el.ringProgress.getBoundingClientRect();
+    el.ringProgress.style.transition = '';
+    clearTimeout(sweepTimer);
+    sweepTimer = setTimeout(() => el.timerRing.classList.remove('sweeping'), 650);
   }
 
   // Work mode uses the user's chosen key color; break mode is always
@@ -113,6 +161,7 @@
   }
 
   function switchMode() {
+    if (mode === 'work') completedWorkSessions += 1;
     mode = mode === 'work' ? 'break' : 'work';
     remainingSec = currentDurationSec();
     applyModeColor();
@@ -122,6 +171,7 @@
       window.pomodoro.notify(title, body);
     }
     playChime();
+    playPhaseSweep();
   }
 
   function tick() {
@@ -153,7 +203,12 @@
     else startTick();
   });
 
-  el.resetBtn.addEventListener('click', resetTimer);
+  // Resetting mid-work abandons that session, which ends the streak; a
+  // reset during a break doesn't undo the work already finished.
+  el.resetBtn.addEventListener('click', () => {
+    if (mode === 'work') completedWorkSessions = 0;
+    resetTimer();
+  });
 
   // Changing minute inputs while stopped updates the visible countdown immediately.
   el.workMin.addEventListener('change', () => {
