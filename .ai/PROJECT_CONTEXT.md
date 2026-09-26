@@ -233,14 +233,23 @@ commands → the compile and build ladder and every report; `generated` →
 - Reduced `#app`'s outer corner radius 46px → 32px per a follow-up request
   ("iPhone style" — tighter, more device-like corners, less of a full
   pill).
-- First real Windows build surfaced the risk flagged at OA-8: the
-  transparent window rendered a solid black rectangle around the rounded
-  `#app` shape instead of true desktop transparency (never reproducible in
-  this Linux/Xvfb container — DWM compositing differs). Fixed with
-  `backgroundColor: '#00000000'` on the `BrowserWindow`, since Windows can
-  default a transparent window's backing surface to opaque black unless
-  that's spelled out explicitly. NOT VERIFIED here either, for the same
-  platform reason; waiting on the user's next real-desktop rebuild.
+- First real Windows build showed a rectangle around the rounded `#app`
+  shape. First attempt, `backgroundColor: '#00000000'` on the
+  `BrowserWindow`, was a MISDIAGNOSIS: I assumed a Windows-only
+  compositing quirk I couldn't reproduce here, and the user confirmed the
+  box was still there. Kept anyway (harmless, correct practice).
+  Real cause, reproduced here once I used the user's actual settings
+  (gray tint ~75%): `#bg-image` and `#bg-tint` were children of `<body>`,
+  siblings of `#app`, so `#app`'s rounded `overflow: hidden` never clipped
+  them. Any non-zero tint or a background image painted the whole
+  rectangular window. The CSS comment even claimed they were clipped.
+  Every earlier test used a fresh settings.json (tint 0, no image), so the
+  layers were invisible and the bug hid. Fixed by moving both inside `#app`
+  with `z-index: -1` (above its glass background, below its content).
+  Evidence: the corner pixel went from `rgba(60,60,60,193)` to
+  `rgba(0,0,0,9)` (only the box-shadow edge).
+  Lesson: reproduce with the user's real settings before blaming the
+  platform.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

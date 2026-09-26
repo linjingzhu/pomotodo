@@ -39,24 +39,25 @@ html, body {
 }
 
 /* Background image (short side fills the widget, long side crops) plus an
-   independent tint overlay; both sit behind #app, clipped to its rounded
-   shape since #app itself hides overflow. The window around #app is
-   transparent (see main.js), so the desktop shows through everywhere the
-   pill shape doesn't cover. */
+   independent tint overlay. Both MUST be children of #app: only then does
+   #app's rounded `overflow: hidden` clip them. As siblings of #app they
+   filled the whole rectangular window and showed as a box around the
+   rounded shape. z-index -1 paints them above #app's own glass background
+   but beneath its content. */
 #bg-image {
   position: absolute;
   inset: -40px;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
 }
 
 #bg-tint {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   background: transparent;
   opacity: 0;
   pointer-events: none;
