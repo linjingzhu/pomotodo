@@ -341,8 +341,15 @@ commands → the compile and build ladder and every report; `generated` →
   - Timeouts of 3 and 25 minutes.
   - No upload-artifact.
   - Ships the Setup exe, the Portable exe and SHA256SUMS.txt.
-  - The repo is private, so release downloads need a signed-in account
-    with access.
+  - While the repo was private, GitHub refused to start any job: no
+    runner was assigned and there were no logs. The owner chose to make
+    the repo public, which makes Actions free.
+  - The first real run then failed. The container's mounted HOME,
+    /github/home, isn't owned by root, and wine refuses to use it. Fixed
+    with `HOME: /root`.
+  - Release v1.0.0 is published: Setup, Portable and SHA256SUMS.
+  - The Setup exe was downloaded anonymously and its checksum matches.
+    It installs under Wine.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

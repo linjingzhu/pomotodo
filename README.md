@@ -6,12 +6,13 @@
 
 [Releases](https://github.com/linjingzhu/pomotodo/releases/latest)에서
 `PomodoroTimer-Setup-<버전>.exe`(설치형) 또는 `PomodoroTimer-Portable-<버전>.exe`
-(설치 없이 실행)를 받으면 됩니다. 저장소가 비공개인 동안에는 저장소에 접근
-권한이 있는 GitHub 계정으로 로그인해야 받을 수 있습니다.
+(설치 없이 실행)를 받으면 됩니다. 공개 저장소라 로그인 없이 누구나 받을 수
+있습니다.
 
 새 버전 배포: `package.json`의 `version`을 올려서 push하면 GitHub Actions
 (`.github/workflows/release.yml`)가 Windows 설치 파일을 빌드해 `v<버전>`
-Release로 올립니다. 비용이 들지 않도록 다음처럼 제한되어 있습니다.
+Release로 올립니다. 공개 저장소에서는 일반 러너 기준으로 Actions가 무료이고,
+그 밖에도 비용이 들지 않도록 다음처럼 제한되어 있습니다.
 - 사용 시간이 1배로 계산되는 Linux 러너만 사용 (Windows 러너는 2배)
 - 이미 있는 버전이면 빌드를 건너뜀
 - 실행 시간 상한 설정
