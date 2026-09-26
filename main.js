@@ -19,6 +19,8 @@ const DEFAULT_SETTINGS = {
   accentColor: '#f2405a',
   windowWidth: 300,
   windowHeight: 460,
+  totalTurns: 0,
+  totalStudySeconds: 0,
 };
 
 const IMAGE_MIME_TYPES = {

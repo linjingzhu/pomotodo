@@ -235,36 +235,37 @@ main {
   #app[data-state="paused"] #timer-display { animation: none; opacity: 0.55; }
 }
 
-/* Consecutive completed work sessions, in sets of four (a classic pomodoro
-   cycle). Absolutely placed so the digits stay dead-center in the ring. */
-#streak {
-  position: absolute;
-  top: calc(50% + 28px);
-  left: 50%;
-  transform: translateX(-50%);
+/* Running totals under the controls: completed work sessions and summed
+   work time, plus their own reset (separate from the timer's reset icon). */
+#stats {
+  width: 170px;
   display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.streak-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  transition: background 0.3s ease, border-color 0.3s ease;
-}
-.streak-dot.done {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: transparent;
-}
-.streak-dot.current { border-color: var(--accent); }
-#streak-cycles {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.7);
-  font-variant-numeric: tabular-nums;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
-#streak-cycles:empty { display: none; }
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+}
+.stat-row span:first-child { color: rgba(255, 255, 255, 0.65); }
+.stat-row span:last-child {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+#stats-reset-btn {
+  align-self: center;
+  margin-top: 4px;
+  padding: 3px 12px;
+  font-size: 11px;
+  -webkit-app-region: no-drag;
+}
+#stats-reset-btn.confirming {
+  background: var(--accent);
+  border-color: var(--accent);
+}
 
 #timer-display {
   position: relative;

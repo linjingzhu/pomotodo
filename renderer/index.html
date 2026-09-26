@@ -25,13 +25,6 @@
           <circle id="ring-tip" cx="112" cy="60" r="3.2" />
         </svg>
         <div id="timer-display">25:00</div>
-        <div id="streak" role="img" title="연속 0회 완료" aria-label="연속 0회 완료">
-          <span class="streak-dot"></span>
-          <span class="streak-dot"></span>
-          <span class="streak-dot"></span>
-          <span class="streak-dot"></span>
-          <span id="streak-cycles"></span>
-        </div>
       </div>
       <div id="controls">
         <button id="start-pause-btn" class="primary" title="시작">
@@ -49,6 +42,11 @@
             <path d="M2.3 2.5 L2.8 6.2 L6.2 5.2 Z" />
           </svg>
         </button>
+      </div>
+      <div id="stats">
+        <div class="stat-row"><span>총 턴</span><span id="total-turns">0</span></div>
+        <div class="stat-row"><span>총 학습시간</span><span id="total-study">0분</span></div>
+        <button id="stats-reset-btn" title="총 턴·총 학습시간을 0으로">초기화</button>
       </div>
     </main>
 

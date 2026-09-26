@@ -277,6 +277,17 @@ commands → the compile and build ladder and every report; `generated` →
   hard-edged shadow rectangle (alpha 78 at the bottom edge), which is a
   second contributor to the user's "box". Shrunk it to `0 1px 2px`; the
   edge alpha is now 0-4.
+- Replaced the streak dots, at the user's request, with persisted totals
+  under the controls: 총 턴 (completed work sessions), 총 학습시간 (every
+  work-mode second actually ticked, including abandoned sessions), and a
+  초기화 button.
+  - The totals reset needs a second click within 3s.
+  - The timer reset no longer touches any count.
+  - Totals are saved to settings.json on each phase switch, on
+    pause/reset, and every 10 work seconds, so at most 10s is lost if the
+    app is killed.
+  - Verified across a restart under Xvfb: 2 turns / 151s saved and
+    restored, then the two-click reset cleared both.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

@@ -3,9 +3,9 @@
     app: document.getElementById('app'),
     timerRing: document.getElementById('timer-ring'),
     ringTip: document.getElementById('ring-tip'),
-    streak: document.getElementById('streak'),
-    streakDots: Array.from(document.querySelectorAll('.streak-dot')),
-    streakCycles: document.getElementById('streak-cycles'),
+    totalTurns: document.getElementById('total-turns'),
+    totalStudy: document.getElementById('total-study'),
+    statsResetBtn: document.getElementById('stats-reset-btn'),
     timerDisplay: document.getElementById('timer-display'),
     startPauseBtn: document.getElementById('start-pause-btn'),
     resetBtn: document.getElementById('reset-btn'),
@@ -47,9 +47,11 @@
   let userAccentColor = '#f2405a';
   let pinnedSize = null; // set while the window size is locked; restored when settings close
   const BREAK_ACCENT_COLOR = '#40e0d0'; // turquoise
-  const STREAK_CYCLE = 4;
-  let completedWorkSessions = 0; // consecutive; abandoning a work session (reset) breaks it
+  let totalTurns = 0; // completed work sessions, persisted
+  let totalStudySeconds = 0; // every second the timer actually ran in work mode, persisted
+  let unsavedStudySeconds = 0;
   let sweepTimer = null;
+  let statsResetTimer = null;
 
   function fmt(sec) {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -73,25 +75,23 @@
     // clockwise from 12 o'clock instead of counterclockwise.
     el.ringProgress.style.strokeDashoffset = String(-RING_CIRCUMFERENCE * (1 - remainingFraction));
     el.ringTip.style.transform = `rotate(${360 * (1 - remainingFraction)}deg)`;
-    renderStreak(state);
+    renderStats();
   }
 
-  // Dots show the current set of four; a "xN" suffix counts full sets. Right
-  // after the 4th session the break keeps all four lit instead of wrapping to
-  // an empty row the moment it's earned.
-  function renderStreak(state) {
-    const n = completedWorkSessions;
-    const setJustFilled = mode === 'break' && n > 0 && n % STREAK_CYCLE === 0;
-    const filled = setJustFilled ? STREAK_CYCLE : n % STREAK_CYCLE;
-    const sets = Math.floor(n / STREAK_CYCLE) - (setJustFilled ? 1 : 0);
-    el.streakDots.forEach((dot, i) => {
-      dot.classList.toggle('done', i < filled);
-      dot.classList.toggle('current', mode === 'work' && state !== 'idle' && i === filled);
-    });
-    el.streakCycles.textContent = sets > 0 ? `×${sets}` : '';
-    const label = `연속 ${n}회 완료`;
-    el.streak.title = label;
-    el.streak.setAttribute('aria-label', label);
+  function fmtStudy(sec) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
+  }
+
+  function renderStats() {
+    el.totalTurns.textContent = String(totalTurns);
+    el.totalStudy.textContent = fmtStudy(totalStudySeconds);
+  }
+
+  function saveStats() {
+    unsavedStudySeconds = 0;
+    window.pomodoro.saveSettings({ totalTurns, totalStudySeconds });
   }
 
   // Jump the arc to empty-but-positioned-to-grow-clockwise without animating,
@@ -161,8 +161,9 @@
   }
 
   function switchMode() {
-    if (mode === 'work') completedWorkSessions += 1;
+    if (mode === 'work') totalTurns += 1;
     mode = mode === 'work' ? 'break' : 'work';
+    saveStats();
     remainingSec = currentDurationSec();
     applyModeColor();
     const title = mode === 'work' ? '작업 시간' : '휴식 시간';
@@ -175,6 +176,12 @@
   }
 
   function tick() {
+    if (mode === 'work') {
+      totalStudySeconds += 1;
+      // Batched so a running timer doesn't rewrite settings.json every second;
+      // at most this many seconds are lost if the app is killed outright.
+      if (++unsavedStudySeconds >= 10) saveStats();
+    }
     remainingSec -= 1;
     if (remainingSec <= 0) {
       switchMode();
@@ -194,6 +201,7 @@
       clearInterval(timerId);
       timerId = null;
     }
+    if (unsavedStudySeconds > 0) saveStats();
     running = false;
     render();
   }
@@ -203,12 +211,28 @@
     else startTick();
   });
 
-  // Resetting mid-work abandons that session, which ends the streak; a
-  // reset during a break doesn't undo the work already finished.
-  el.resetBtn.addEventListener('click', () => {
-    if (mode === 'work') completedWorkSessions = 0;
-    resetTimer();
+  el.resetBtn.addEventListener('click', resetTimer);
+
+  // Wiping the totals is permanent, so it takes a second click within 3s.
+  el.statsResetBtn.addEventListener('click', () => {
+    if (!el.statsResetBtn.classList.contains('confirming')) {
+      el.statsResetBtn.classList.add('confirming');
+      el.statsResetBtn.textContent = '한 번 더 누르면 초기화';
+      statsResetTimer = setTimeout(disarmStatsReset, 3000);
+      return;
+    }
+    disarmStatsReset();
+    totalTurns = 0;
+    totalStudySeconds = 0;
+    saveStats();
+    renderStats();
   });
+
+  function disarmStatsReset() {
+    clearTimeout(statsResetTimer);
+    el.statsResetBtn.classList.remove('confirming');
+    el.statsResetBtn.textContent = '초기화';
+  }
 
   // Changing minute inputs while stopped updates the visible countdown immediately.
   el.workMin.addEventListener('change', () => {
@@ -346,6 +370,8 @@
     applyBackgroundBlur(settings.backgroundBlur);
     applyBackgroundTint(settings.backgroundTintColor, Math.round(settings.backgroundTintOpacity * 100));
     if (background) setBackgroundImage(background.dataUrl);
+    totalTurns = settings.totalTurns;
+    totalStudySeconds = settings.totalStudySeconds;
     remainingSec = settings.workMinutes * 60;
     render();
     await populateDisplays();
