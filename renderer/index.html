@@ -12,7 +12,6 @@
     <div id="bg-tint"></div>
     <div class="titlebar-actions">
       <button id="close-btn" title="Close"></button>
-      <button id="gear-btn" title="Goals · Calendar · Settings"></button>
       <button id="pin-btn" title="Lock window size" aria-pressed="false"></button>
       <button id="fullscreen-btn" title="Fullscreen"></button>
     </div>
@@ -154,6 +153,11 @@
       </div>
       </div>
     </section>
+
+    <!-- after the panel in the DOM so it stays on top of it when open -->
+    <div class="corner-actions bottom">
+      <button id="gear-btn" title="Goals · Calendar · Settings"></button>
+    </div>
   </div>
 
   <script src="renderer.js"></script>

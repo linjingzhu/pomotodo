@@ -90,7 +90,8 @@ html, body {
 
 /* Pin/settings/close: tucked in the top-right corner, invisible until the
    widget is hovered so the idle view stays clean. */
-.titlebar-actions {
+.titlebar-actions,
+.corner-actions {
   position: absolute;
   top: 14px;
   right: 14px;
@@ -103,9 +104,18 @@ html, body {
   transition: opacity 0.18s ease;
   -webkit-app-region: no-drag;
 }
+/* The panel (Goals / Calendar / Settings) dot sits alone in the bottom-right
+   corner, revealed the same way. */
+.corner-actions.bottom {
+  top: auto;
+  bottom: 14px;
+}
 #app:hover .titlebar-actions,
 #app.pointer-inside .titlebar-actions,
-.titlebar-actions:focus-within {
+.titlebar-actions:focus-within,
+#app:hover .corner-actions,
+#app.pointer-inside .corner-actions,
+.corner-actions:focus-within {
   opacity: 1;
 }
 
