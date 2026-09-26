@@ -543,6 +543,23 @@ commands → the compile and build ladder and every report; `generated` →
     scrolling panel) for a brighter border. Select options get a dark
     background and light text: the native popup's white background hid
     the inherited white text of unselected items.
+- 1.0.6: three items the user picked from the feature research.
+  - Long break: a `longBreak` mode after every `longBreakEvery`
+    (default 4, 2-12) finished focus sessions, lasting `longBreakMinutes`
+    (default 15). `focusInCycle` is in memory only; Reset Session zeroes
+    it.
+  - Auto-start choice: `autoStartBreaks` and `autoStartFocus` (both
+    default true, the old behavior). When off, `advanceTo` stops at the
+    phase switch and the new phase waits idle at full time; the
+    notification adds "Press Start when you're ready."
+  - Taskbar progress: `window:progress` sets the elapsed share
+    (normal), yellow when paused, -1 when idle, sent only on change
+    (about once a second). The tray tooltip gets the phase and time too,
+    added because minimize-to-tray (the default) removes the taskbar
+    button.
+  - Verified under Xvfb by skewing the renderer's Date.now, since timing
+    is wall-clock: every transition, the saved settings, and the
+    setProgressBar calls.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

@@ -17,6 +17,10 @@
     settingsPanel: document.getElementById('settings-panel'),
     workMin: document.getElementById('work-min'),
     breakMin: document.getElementById('break-min'),
+    longBreakMin: document.getElementById('long-break-min'),
+    longBreakEvery: document.getElementById('long-break-every'),
+    autoStartBreaks: document.getElementById('auto-start-breaks'),
+    autoStartFocus: document.getElementById('auto-start-focus'),
     notifyOnPhaseChange: document.getElementById('notify-on-phase-change'),
     alwaysTop: document.getElementById('always-top'),
     minimizeToTray: document.getElementById('minimize-to-tray'),
@@ -37,7 +41,9 @@
 
 
 
-  let mode = 'work'; // 'work' | 'break'
+  let mode = 'work'; // 'work' | 'break' | 'longBreak'
+  // Focus sessions finished since the last long break (not persisted).
+  let focusInCycle = 0;
   // Time is kept by the wall clock, not by counting ticks: a hidden or
   // minimized window's timers can be throttled to one wake-up a minute,
   // which made a tick-counting timer all but stop in the tray. Ticks only
@@ -86,6 +92,22 @@
     // o'clock is the depleted portion growing clockwise.
     el.ringFill.style.setProperty('--ring-start', `${360 * (1 - remainingFraction)}deg`);
     renderStats();
+    reportProgress(state, 1 - remainingFraction);
+  }
+
+  // Taskbar progress (elapsed share; yellow while paused, none when idle)
+  // and the tray tooltip, for when the window is minimized or in the tray.
+  // Sent only when something visible changes: about once a second.
+  let lastProgress = '';
+  function reportProgress(state, elapsed) {
+    const time = fmt(Math.ceil(remainingMs / 1000));
+    const suffix = state === 'paused' ? ' (paused)' : state === 'idle' ? ' (ready)' : '';
+    const label = `Pomodoro Timer · ${PHASE_NAMES[mode]} ${time}${suffix}`;
+    const fraction = Math.round(elapsed * 1000) / 1000;
+    const key = `${state}|${fraction}|${label}`;
+    if (key === lastProgress) return;
+    lastProgress = key;
+    window.pomodoro.setProgress(state, fraction, label);
   }
 
   function fmtStudy(sec) {
@@ -136,8 +158,18 @@
   }
 
   function currentDurationSec() {
-    const minutes = mode === 'work' ? Number(el.workMin.value || 25) : Number(el.breakMin.value || 5);
+    const minutes = mode === 'work' ? Number(el.workMin.value || 25)
+      : mode === 'longBreak' ? Number(el.longBreakMin.value || 15)
+        : Number(el.breakMin.value || 5);
     return Math.max(1, minutes) * 60;
+  }
+
+  const PHASE_NAMES = { work: 'Focus', break: 'Break', longBreak: 'Long break' };
+
+  // Whether the phase that just began should run on its own, or wait at
+  // full time for Start.
+  function autoStartsCurrentPhase() {
+    return mode === 'work' ? el.autoStartFocus.checked : el.autoStartBreaks.checked;
   }
 
   function resetTimer() {
@@ -185,18 +217,25 @@
     }).then(() => window.dispatchEvent(new Event('session-recorded')));
   }
 
+  // Every Nth finished focus session is followed by a long break.
   function switchMode() {
     if (mode === 'work') {
       totalTurns += 1;
       finishSession(true);
+      focusInCycle += 1;
+      const long = focusInCycle >= Math.max(2, Number(el.longBreakEvery.value || 4));
+      if (long) focusInCycle = 0;
+      mode = long ? 'longBreak' : 'break';
+    } else {
+      mode = 'work';
     }
-    mode = mode === 'work' ? 'break' : 'work';
     saveStats();
     remainingMs = currentDurationSec() * 1000;
     applyModeColor();
     // `mode` is already the phase that's starting.
     const title = mode === 'work' ? 'Break is over' : 'Focus time is over';
-    const body = mode === 'work' ? 'Time to focus.' : 'Take a short break.';
+    let body = mode === 'work' ? 'Time to focus.' : mode === 'longBreak' ? 'Take a long break.' : 'Take a short break.';
+    if (!autoStartsCurrentPhase()) body += ' Press Start when you\'re ready.';
     if (el.notifyOnPhaseChange.checked) {
       window.pomodoro.notify(title, body);
     }
@@ -229,6 +268,15 @@
       lastTickAt = upTo;
       if (now < phaseEndAt) break;
       switchMode();
+      if (!autoStartsCurrentPhase()) {
+        // Waits at full time (idle) for Start.
+        if (timerId) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+        running = false;
+        return;
+      }
       phaseEndAt = upTo + remainingMs;
     }
     remainingMs = phaseEndAt - now;
@@ -292,6 +340,7 @@
     if (mode === 'work') finishSession(false);
     session = null;
     mode = 'work';
+    focusInCycle = 0;
     applyModeColor();
     remainingMs = currentDurationSec() * 1000;
     totalTurns = 0;
@@ -308,6 +357,19 @@
   el.breakMin.addEventListener('change', () => {
     window.pomodoro.saveSettings({ breakMinutes: Number(el.breakMin.value) });
     if (!running && mode === 'break') resetTimer();
+  });
+  el.longBreakMin.addEventListener('change', () => {
+    window.pomodoro.saveSettings({ longBreakMinutes: Number(el.longBreakMin.value) });
+    if (!running && mode === 'longBreak') resetTimer();
+  });
+  el.longBreakEvery.addEventListener('change', () => {
+    window.pomodoro.saveSettings({ longBreakEvery: Number(el.longBreakEvery.value) });
+  });
+  el.autoStartBreaks.addEventListener('change', () => {
+    window.pomodoro.saveSettings({ autoStartBreaks: el.autoStartBreaks.checked });
+  });
+  el.autoStartFocus.addEventListener('change', () => {
+    window.pomodoro.saveSettings({ autoStartFocus: el.autoStartFocus.checked });
   });
 
   el.notifyOnPhaseChange.addEventListener('change', () => {
@@ -536,6 +598,10 @@
     ]);
     el.workMin.value = settings.workMinutes;
     el.breakMin.value = settings.breakMinutes;
+    el.longBreakMin.value = settings.longBreakMinutes;
+    el.longBreakEvery.value = settings.longBreakEvery;
+    el.autoStartBreaks.checked = settings.autoStartBreaks;
+    el.autoStartFocus.checked = settings.autoStartFocus;
     el.notifyOnPhaseChange.checked = settings.notifyOnPhaseChange;
     el.alwaysTop.checked = settings.alwaysOnTop;
     setPinButtonState(settings.sizeLocked);

@@ -8,6 +8,10 @@ const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
 const DEFAULT_SETTINGS = {
   workMinutes: 25,
   breakMinutes: 5,
+  longBreakMinutes: 15,
+  longBreakEvery: 4,
+  autoStartBreaks: true,
+  autoStartFocus: true,
   alwaysOnTop: false,
   minimizeToTray: true,
   closeToTray: false,
@@ -281,6 +285,19 @@ ipcMain.handle('window:getDisplays', () => {
     label: `Monitor ${idx + 1}${d.id === primaryId ? ' (primary)' : ''} — ${d.bounds.width}x${d.bounds.height}`,
     bounds: d.bounds,
   }));
+});
+
+// Taskbar button progress: the running phase's elapsed share (normal),
+// yellow while paused, cleared when idle. The tray tooltip carries the
+// same state, since the window has no taskbar button while in the tray.
+ipcMain.on('window:progress', (_evt, { state, fraction, label } = {}) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (state === 'idle' || !Number.isFinite(fraction)) {
+    mainWindow.setProgressBar(-1);
+  } else {
+    mainWindow.setProgressBar(Math.min(1, Math.max(0, fraction)), { mode: state === 'paused' ? 'paused' : 'normal' });
+  }
+  if (tray && typeof label === 'string') tray.setToolTip(label.slice(0, 120));
 });
 
 // Electron documents transparent windows as not resizable, and on Windows
