@@ -472,8 +472,7 @@ select {
   border-bottom-color: var(--accent);
 }
 
-input[type="text"],
-input[type="password"] {
+input[type="text"] {
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   color: var(--text);
@@ -483,8 +482,6 @@ input[type="password"] {
   font-size: 12px;
   min-width: 0;
 }
-#settings-panel .row input[type="text"],
-#settings-panel .row input[type="password"] { width: 150px; }
 
 .hint {
   margin: 0;
@@ -492,11 +489,6 @@ input[type="password"] {
   font-size: 11px;
   line-height: 1.45;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-}
-.hint.error { color: #ff8a8a; }
-.section-title {
-  font-weight: 600;
-  font-size: 12px;
 }
 
 /* The tab bar stays put and only the tab body below it scrolls, so rows

@@ -446,6 +446,16 @@ commands → the compile and build ladder and every report; `generated` →
   - The tray loads tray-icon.png, and nativeImage picks up @2x (scale
     factors [1,2]). Before, it was a 256px icon resized to 16.
   - The `wrestool` extract of the built exe shows all 7 sizes.
+- Google Calendar sync removed, per the user (no external calendar
+  connection): gcal.js, its tests, gcal IPC and preload methods, the
+  Settings > Google Calendar section, and `gcalEventId` bookkeeping in
+  store.js (setGoalEvent, pendingSync, clearEventIds).
+  - The user first said to drop the Calendar tab too, then reversed that
+    mid-edit. The in-app Calendar tab stays: month grid, day list, note
+    editing, all local.
+  - OA-15 is marked not applicable.
+  - Existing users' google-calendar.json in userData is left alone
+    (harmless).
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

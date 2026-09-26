@@ -24,10 +24,4 @@ contextBridge.exposeInMainWorld('pomodoro', {
   addGoal: (title) => ipcRenderer.invoke('goals:add', title),
   setGoalDone: (id, done) => ipcRenderer.invoke('goals:setDone', { id, done }),
   deleteGoal: (id) => ipcRenderer.invoke('goals:delete', id),
-  getGcalStatus: () => ipcRenderer.invoke('gcal:status'),
-  saveGcalClient: (clientId, clientSecret) => ipcRenderer.invoke('gcal:saveClient', { clientId, clientSecret }),
-  connectGcal: () => ipcRenderer.invoke('gcal:connect'),
-  disconnectGcal: () => ipcRenderer.invoke('gcal:disconnect'),
-  syncGcalNow: () => ipcRenderer.invoke('gcal:syncNow'),
-  onGcalStatus: (callback) => ipcRenderer.on('gcal:status', (_evt, status) => callback(status)),
 });
