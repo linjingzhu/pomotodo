@@ -491,6 +491,33 @@ commands → the compile and build ladder and every report; `generated` →
   - Events: `goals-changed` and `task-changed` keep the list fresh.
   - The placeholder is now "Goal for this session".
   - E2E under Xvfb used real typing: insertText plus an Enter keydown.
+- 1.0.5 UI fixes, per the user.
+  - The gear dot now lives inside `<main>` (`position: relative`), so it
+    sits at the bottom-right of the timer area and rides just above the
+    panel when that opens, instead of staying pinned to the window corner.
+  - Calendar: today is shown in bright orange (#ffa53d, number and ring);
+    the goal-reached check marks on days were removed. Reached goals are
+    still listed in the day view.
+  - The stats reset button reads "Reset Session".
+  - Edge-drag resizing, which never worked on Windows: Electron documents
+    transparent windows as not resizable, yet a resizable frameless
+    window still reserves a dead ~5px native resize strip at its edges.
+    The window is now always `resizable: false` (those pixels then reach
+    the page, measured with real X input under Xvfb). Eight
+    `#resize-handles` strips/corners drive `window:resizeStart/Move/End`,
+    which recomputes bounds from the drag start and applies them via
+    `withResizeUnlocked`. The size lock is now an app flag only (handles
+    hidden, main refuses). Fullscreen hides the handles, main refuses, and
+    a `will-resize` backstop cancels anything else; setFullScreen is
+    wrapped in `withResizeUnlocked`.
+  - Goal check: a round check at the timer goal field's left, shown on
+    hover or focus once there is a goal, shows that goal's reached state.
+    A click flips it. Reaching it loads the next unreached goal in the
+    Goals list order (after it, else the first one); when all are
+    reached, the goal stays. Text not yet in the list is added, then
+    marked reached. Goal edits anywhere dispatch `goals-changed`.
+  - Reset Session also resets the timer fully: stop, record an
+    in-progress focus session like ↻ does, back to work mode, idle.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

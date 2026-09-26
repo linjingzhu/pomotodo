@@ -56,8 +56,7 @@
     check.addEventListener('change', async () => {
       check.disabled = true;
       await api.setGoalDone(goal.id, check.checked);
-      await loadGoals();
-      if (activeTab === 'calendar') loadMonth();
+      window.dispatchEvent(new Event('goals-changed')); // reloads this list too
     });
     const when = goal.doneAt
       ? make('span', { className: 'goal-date', textContent: `reached ${new Date(goal.doneAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` })
@@ -66,7 +65,7 @@
     remove.setAttribute('aria-label', `Delete goal: ${goal.title}`);
     remove.addEventListener('click', async () => {
       await api.deleteGoal(goal.id);
-      loadGoals();
+      window.dispatchEvent(new Event('goals-changed'));
     });
     const current = $('task-input').value.trim().toLowerCase() === goal.title.toLowerCase();
     const title = make('span', {
@@ -97,7 +96,7 @@
     if (!input.value.trim()) return;
     await api.addGoal(input.value);
     input.value = '';
-    loadGoals();
+    window.dispatchEvent(new Event('goals-changed'));
   });
 
   // ---- calendar ----
@@ -127,7 +126,6 @@
       const k = dayKey(new Date(s.start));
       perDay[k] = (perDay[k] || 0) + s.workedSec;
     });
-    const goalDays = new Set(monthData.goalsDone.map((g) => dayKey(new Date(g.doneAt))));
 
     const cells = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => make('span', { className: 'cal-weekday', textContent: d }));
     for (let i = 0; i < viewMonth.getDay(); i++) cells.push(make('span'));
@@ -138,7 +136,6 @@
       const cell = make('button', { className: `cal-day level-${level(sec)}`, textContent: String(d) });
       if (key === dayKey(today)) cell.classList.add('today');
       if (key === selectedDay) cell.classList.add('selected');
-      if (goalDays.has(key)) cell.classList.add('goal');
       cell.title = sec ? `${duration(sec)} of focus` : 'No focus sessions';
       cell.addEventListener('click', () => {
         selectedDay = key;
@@ -187,9 +184,11 @@
     loadMonth();
   });
 
-  // Keep the list in step with the timer's goal field.
+  // Keep the list in step with the timer's goal field (and the calendar,
+  // which lists reached goals, with goal changes).
   ['goals-changed', 'task-changed'].forEach((name) => window.addEventListener(name, () => {
     if (activeTab === 'goals') loadGoals();
+    if (activeTab === 'calendar' && name === 'goals-changed') loadMonth();
   }));
 
   window.addEventListener('session-recorded', () => {

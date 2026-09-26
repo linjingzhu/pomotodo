@@ -2,6 +2,8 @@
   const el = {
     app: document.getElementById('app'),
     taskInput: document.getElementById('task-input'),
+    goalField: document.getElementById('goal-field'),
+    goalCheck: document.getElementById('goal-check'),
     totalTurns: document.getElementById('total-turns'),
     totalStudy: document.getElementById('total-study'),
     statsResetBtn: document.getElementById('stats-reset-btn'),
@@ -233,11 +235,21 @@
     resetTimer();
   });
 
+  // Reset Session: the timer goes all the way back to a fresh, idle focus
+  // period (like ↻, an in-progress focus session of a minute or more is
+  // still recorded), and both totals return to 0.
   el.statsResetBtn.addEventListener('click', () => {
+    window.pomodoro.closeNotification();
+    stopTick();
+    if (mode === 'work') finishSession(false);
+    session = null;
+    mode = 'work';
+    applyModeColor();
+    remainingSec = currentDurationSec();
     totalTurns = 0;
     totalStudySeconds = 0;
     saveStats();
-    renderStats();
+    render();
   });
 
   // Changing minute inputs while stopped updates the visible countdown immediately.
@@ -272,7 +284,44 @@
 
   function setPinButtonState(locked) {
     el.pinBtn.setAttribute('aria-pressed', String(locked));
+    el.app.classList.toggle('size-locked', locked);
   }
+
+  // Edge and corner handles resize the window (the window is transparent,
+  // so it has no native resize border). Pointer capture keeps the moves
+  // coming while the cursor is outside the window; at most one resize is
+  // sent per frame, and the last one always goes out.
+  document.querySelectorAll('#resize-handles > div').forEach((handle) => {
+    handle.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      const { edge } = handle.dataset;
+      const startX = e.screenX;
+      const startY = e.screenY;
+      let pending = null;
+      let done = false;
+      const flush = () => {
+        if (pending) window.pomodoro.resizeMove(edge, pending.dx, pending.dy);
+        pending = null;
+      };
+      const move = (ev) => {
+        if (!pending) requestAnimationFrame(flush);
+        pending = { dx: ev.screenX - startX, dy: ev.screenY - startY };
+      };
+      const end = () => {
+        if (done) return;
+        done = true;
+        flush();
+        window.pomodoro.resizeEnd();
+        handle.removeEventListener('pointermove', move);
+      };
+      window.pomodoro.resizeStart();
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', end, { once: true });
+      handle.addEventListener('lostpointercapture', end, { once: true });
+    });
+  });
 
   el.pinBtn.addEventListener('click', async () => {
     const locked = el.pinBtn.getAttribute('aria-pressed') !== 'true';
@@ -283,7 +332,7 @@
   // Works whether or not pinned; leaving fullscreen restores the exact size
   // and position the window had before.
   el.fullscreenBtn.addEventListener('click', () => window.pomodoro.toggleFullscreen());
-  // Also fires when Esc or a drag leaves fullscreen.
+  // Also fires when Esc leaves fullscreen.
   window.pomodoro.onFullscreenChange((on) => {
     el.fullscreenBtn.title = on ? 'Windowed (Esc)' : 'Fullscreen';
     el.app.classList.toggle('fullscreen', on);
@@ -360,6 +409,53 @@
     window.dispatchEvent(new Event('goals-changed'));
   });
 
+  // The timer goal's own entry in the Goals list: an open goal with the
+  // same title (any case), else the latest reached one.
+  function matchGoal(goals) {
+    const title = el.taskInput.value.trim().toLowerCase();
+    if (!title) return null;
+    const same = goals.filter((g) => g.title.toLowerCase() === title);
+    return same.find((g) => !g.doneAt) || same[0] || null;
+  }
+
+  let goalCheckToken = 0;
+  async function refreshGoalCheck() {
+    const token = ++goalCheckToken;
+    el.goalField.classList.toggle('has-goal', !!el.taskInput.value.trim());
+    const goal = matchGoal(await window.pomodoro.listGoals());
+    if (token !== goalCheckToken) return; // a newer refresh is on its way
+    const reached = !!(goal && goal.doneAt);
+    el.goalCheck.setAttribute('aria-checked', String(reached));
+    el.goalCheck.title = reached ? 'Reached. Click to mark as not reached' : 'Mark this goal as reached';
+  }
+
+  // Clicking the check flips the goal's reached state. Reaching it moves the
+  // timer on to the next unreached goal in the Goals list; when every goal
+  // is reached, this one stays.
+  el.goalCheck.addEventListener('click', async () => {
+    const title = el.taskInput.value.trim();
+    if (!title) return;
+    const goals = await window.pomodoro.listGoals();
+    const goal = matchGoal(goals);
+    if (goal && goal.doneAt) {
+      await window.pomodoro.setGoalDone(goal.id, false);
+    } else {
+      const reached = goal || await window.pomodoro.addGoal(title);
+      await window.pomodoro.setGoalDone(reached.id, true);
+      const open = goals.filter((g) => !g.doneAt);
+      const at = open.findIndex((g) => g.id === reached.id);
+      const next = (at >= 0 && open[at + 1]) || open.find((g) => g.id !== reached.id);
+      if (next) {
+        el.taskInput.value = next.title;
+        el.taskInput.dispatchEvent(new Event('change'));
+      }
+    }
+    window.dispatchEvent(new Event('goals-changed'));
+  });
+
+  ['goals-changed', 'task-changed'].forEach((name) => window.addEventListener(name, refreshGoalCheck));
+  el.taskInput.addEventListener('input', refreshGoalCheck);
+
   el.cornerButtons.forEach((btn) => {
     btn.addEventListener('click', async () => {
       const displayId = Number(el.displaySelect.value);
@@ -402,6 +498,7 @@
     applyBackgroundTint(settings.backgroundTintColor, Math.round(settings.backgroundTintOpacity * 100));
     if (background) setBackgroundImage(background.dataUrl);
     el.taskInput.value = settings.currentTask;
+    refreshGoalCheck();
     totalTurns = settings.totalTurns;
     totalStudySeconds = settings.totalStudySeconds;
     remainingSec = settings.workMinutes * 60;

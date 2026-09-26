@@ -67,6 +67,8 @@ function saveSettings(partial) {
 let mainWindow = null;
 let tray = null;
 
+const MIN_SIZE = { width: 180, height: 140 };
+
 // Launch size = the expanded-panel size (the largest the layout needs);
 // the panel opens inside the window instead of resizing it. Installs from
 // before this saved the old 460px launch height, so move them once.
@@ -88,10 +90,15 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: size.width,
     height: size.height,
-    minWidth: 180,
-    minHeight: 140,
+    minWidth: MIN_SIZE.width,
+    minHeight: MIN_SIZE.height,
     alwaysOnTop: settings.alwaysOnTop,
-    resizable: !settings.sizeLocked,
+    // Never natively resizable: transparent windows get no working resize
+    // border on Windows, yet a resizable frameless window still reserves a
+    // dead ~5px strip at its edges for one. Non-resizable, those pixels
+    // reach the page, whose own edge handles resize the window
+    // (window:resizeMove), honoring the size lock and fullscreen.
+    resizable: false,
     frame: false,
     transparent: true,
     // Windows can default a transparent window's backing surface to opaque
@@ -147,6 +154,13 @@ function createWindow() {
   // turns off the drag region then; this backstop cancels any other
   // user-initiated move ('will-move' fires on Windows and macOS only).
   mainWindow.on('will-move', (event) => {
+    if (isFullscreen()) event.preventDefault();
+  });
+  // Nor can it be resized then: the renderer hides its edge handles and
+  // window:resizeMove refuses; this backstop cancels any user-initiated
+  // resize that still gets through ('will-resize' is never emitted for our
+  // own setBounds calls).
+  mainWindow.on('will-resize', (event) => {
     if (isFullscreen()) event.preventDefault();
   });
 
@@ -223,7 +237,6 @@ ipcMain.handle('window:setAlwaysOnTop', (_evt, flag) => {
 });
 
 ipcMain.handle('window:setSizeLocked', (_evt, flag) => {
-  mainWindow.setResizable(!flag);
   return { sizeLocked: saveSettings({ sizeLocked: !!flag }).sizeLocked };
 });
 
@@ -245,6 +258,41 @@ ipcMain.handle('window:getDisplays', () => {
   }));
 });
 
+// Electron documents transparent windows as not resizable, and on Windows
+// they get no native resize border at all, so the renderer draws its own
+// edge and corner handles and drives the resize through here. dx/dy are the
+// pointer's movement in screen DIPs since the drag began; bounds are
+// recomputed from the start each time, so nothing drifts. Ignored while
+// the size is locked or fullscreen.
+const RESIZE_EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+let resizeFrom = null;
+
+ipcMain.on('window:resizeStart', () => {
+  resizeFrom = isFullscreen() || loadSettings().sizeLocked ? null : mainWindow.getBounds();
+});
+
+ipcMain.on('window:resizeMove', (_evt, { edge, dx, dy } = {}) => {
+  if (!resizeFrom || isFullscreen() || !RESIZE_EDGES.includes(edge)) return;
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+  const from = resizeFrom;
+  let width = from.width;
+  let height = from.height;
+  if (edge.includes('e')) width += dx;
+  if (edge.includes('w')) width -= dx;
+  if (edge.includes('s')) height += dy;
+  if (edge.includes('n')) height -= dy;
+  width = Math.max(MIN_SIZE.width, Math.round(width));
+  height = Math.max(MIN_SIZE.height, Math.round(height));
+  // Dragging the left or top edge keeps the opposite edge where it was.
+  const x = edge.includes('w') ? from.x + from.width - width : from.x;
+  const y = edge.includes('n') ? from.y + from.height - height : from.y;
+  withResizeUnlocked(() => mainWindow.setBounds({ x, y, width, height }));
+});
+
+ipcMain.on('window:resizeEnd', () => {
+  resizeFrom = null;
+});
+
 // corner: 'tl' | 'tr' | 'bl' | 'br'
 ipcMain.handle('window:snapToCorner', (_evt, { displayId, corner }) => {
   if (isFullscreen()) return null;
@@ -263,9 +311,11 @@ ipcMain.handle('window:snapToCorner', (_evt, { displayId, corner }) => {
 });
 
 // setSize()/setBounds() are unreliable on at least some platforms while
-// resizable is false (reproduced even with no app code involved) - briefly
-// unlock around our own programmatic resize, then restore the lock. The
-// window is never draggable-by-the-user in between: this runs synchronously.
+// resizable is false (Electron then pins the min and max size to the
+// current size) - and the window is always non-resizable (see
+// createWindow) - so briefly unlock around our own programmatic resize,
+// then restore the lock. The user can't grab an edge in between: this
+// runs synchronously.
 function withResizeUnlocked(fn) {
   const wasLocked = !mainWindow.isResizable();
   if (wasLocked) mainWindow.setResizable(true);
@@ -304,7 +354,7 @@ function reassertRestore() {
 function exitFullscreen() {
   restoreTarget = fullscreenBounds;
   fullscreenBounds = null;
-  mainWindow.setFullScreen(false);
+  withResizeUnlocked(() => mainWindow.setFullScreen(false));
   mainWindow.webContents.send('window:fullscreen', false);
   reassertRestore();
   setTimeout(() => {
@@ -326,7 +376,7 @@ ipcMain.handle('window:toggleFullscreen', () => {
   }
   restoreTarget = null;
   fullscreenBounds = mainWindow.getBounds();
-  mainWindow.setFullScreen(true);
+  withResizeUnlocked(() => mainWindow.setFullScreen(true));
   mainWindow.webContents.send('window:fullscreen', true);
   return true;
 });
