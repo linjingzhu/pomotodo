@@ -62,9 +62,11 @@ html, body {
   pointer-events: none;
 }
 
-/* #app is the entire visible widget: a single continuously-rounded "pill"
-   of glass. Overflow is clipped to it so the settings panel, background
-   image and tint never poke out past its rounded corners. */
+/* #app is the entire visible widget: a single continuously-rounded glass
+   shape. Overflow is clipped to it so the settings panel, background image
+   and tint never poke out past its rounded corners. A tighter, iPhone-like
+   corner radius (proportionally closer to a real device's) rather than a
+   full pill. */
 #app {
   position: relative;
   z-index: 1;
@@ -72,7 +74,7 @@ html, body {
   height: calc(100vh - 6px);
   display: flex;
   flex-direction: column;
-  border-radius: 46px;
+  border-radius: 32px;
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));

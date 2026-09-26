@@ -230,6 +230,9 @@ commands → the compile and build ladder and every report; `generated` →
   `getBoundingClientRect()` under Xvfb). Pin's hollow/filled state moved
   from an inner circle's fill/stroke to the button's own
   background/border.
+- Reduced `#app`'s outer corner radius 46px → 32px per a follow-up request
+  ("iPhone style" — tighter, more device-like corners, less of a full
+  pill).
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
