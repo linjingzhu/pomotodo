@@ -1,6 +1,7 @@
 (() => {
   const el = {
     app: document.getElementById('app'),
+    taskInput: document.getElementById('task-input'),
     totalTurns: document.getElementById('total-turns'),
     totalStudy: document.getElementById('total-study'),
     statsResetBtn: document.getElementById('stats-reset-btn'),
@@ -46,6 +47,11 @@
   let totalTurns = 0; // completed work sessions, persisted
   let totalStudySeconds = 0; // every second the timer actually ran in work mode, persisted
   let unsavedStudySeconds = 0;
+  // The focus session in progress: when it began and the seconds actually
+  // ticked (pauses excluded). Recorded when it completes, or when it's reset
+  // after at least a minute of work.
+  let session = null;
+  const MIN_RECORDED_SEC = 60;
 
   function fmt(sec) {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -124,6 +130,7 @@
   }
 
   function resetTimer() {
+    if (mode === 'work') finishSession(false);
     stopTick();
     remainingSec = currentDurationSec();
     running = false;
@@ -153,8 +160,24 @@
     }
   }
 
+  function finishSession(completed) {
+    const done = session;
+    session = null;
+    if (!done || (!completed && done.workedSec < MIN_RECORDED_SEC)) return;
+    window.pomodoro.addSession({
+      start: done.start,
+      end: new Date().toISOString(),
+      workedSec: done.workedSec,
+      note: el.taskInput.value.trim(),
+      completed,
+    }).then(() => window.dispatchEvent(new Event('session-recorded')));
+  }
+
   function switchMode() {
-    if (mode === 'work') totalTurns += 1;
+    if (mode === 'work') {
+      totalTurns += 1;
+      finishSession(true);
+    }
     mode = mode === 'work' ? 'break' : 'work';
     saveStats();
     remainingSec = currentDurationSec();
@@ -171,6 +194,8 @@
 
   function tick() {
     if (mode === 'work') {
+      if (!session) session = { start: new Date(Date.now() - 1000).toISOString(), workedSec: 0 };
+      session.workedSec += 1;
       totalStudySeconds += 1;
       // Batched so a running timer doesn't rewrite settings.json every second;
       // at most this many seconds are lost if the app is killed outright.
@@ -318,6 +343,14 @@
     // size was pinned, if any, rather than always the generic default.
     const size = panelOpen ? EXPANDED_SIZE : (pinnedSize || COLLAPSED_SIZE);
     await window.pomodoro.resizeWindow(size.width, size.height);
+    window.dispatchEvent(new CustomEvent('panel-toggled', { detail: panelOpen }));
+  });
+
+  el.taskInput.addEventListener('change', () => {
+    window.pomodoro.saveSettings({ currentTask: el.taskInput.value.trim() });
+  });
+  el.taskInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') el.taskInput.blur();
   });
 
   el.cornerButtons.forEach((btn) => {
@@ -361,6 +394,7 @@
     applyBackgroundBlur(settings.backgroundBlur);
     applyBackgroundTint(settings.backgroundTintColor, Math.round(settings.backgroundTintOpacity * 100));
     if (background) setBackgroundImage(background.dataUrl);
+    el.taskInput.value = settings.currentTask;
     totalTurns = settings.totalTurns;
     totalStudySeconds = settings.totalStudySeconds;
     remainingSec = settings.workMinutes * 60;

@@ -159,13 +159,15 @@ main {
   padding: 16px 24px 22px;
 }
 
-/* Ring diameter, shared with #stats so the stats span exactly the ring's
-   width. cq units measure main's content box; 158px = the two 14px gaps
-   + 58px controls + 70px stats block, with 2px spare. Declared on both
-   children (not on main) because cq units resolve against an ancestor. */
+/* Ring diameter, shared with #task-input and #stats so they span exactly
+   the ring's width. cq units measure main's content box; 198px = three
+   14px gaps + 58px controls + 26px task input + 70px stats block, with 2px
+   spare. Declared on the children (not on main) because cq units resolve
+   against an ancestor. */
 #timer-ring,
+#task-input,
 #stats {
-  --ring: clamp(96px, min(100cqw, 100cqh - 158px), 190px);
+  --ring: clamp(96px, min(100cqw, 100cqh - 198px), 190px);
 }
 
 #timer-ring {
@@ -444,3 +446,196 @@ select {
   font-size: 12px;
   max-width: 150px;
 }
+
+.hidden { display: none !important; }
+
+/* What the current focus session is about; saved with the session. */
+#task-input {
+  flex-shrink: 0;
+  width: max(var(--ring), 176px);
+  height: 26px;
+  padding: 2px 4px;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  -webkit-app-region: no-drag;
+}
+#task-input::placeholder { color: rgba(255, 255, 255, 0.5); }
+#task-input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+input[type="text"],
+input[type="password"] {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  min-width: 0;
+}
+#settings-panel .row input[type="text"],
+#settings-panel .row input[type="password"] { width: 150px; }
+
+.hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.hint.error { color: #ff8a8a; }
+.section-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* Tabs stay visible while the panel scrolls. */
+#panel-tabs {
+  position: sticky;
+  top: -12px;
+  z-index: 1;
+  display: flex;
+  gap: 6px;
+  margin: -12px -14px 4px;
+  padding: 10px 14px 8px;
+  background: rgba(14, 14, 20, 0.9);
+}
+#panel-tabs button {
+  flex: 1;
+  padding: 4px 0;
+  font-size: 12px;
+}
+#panel-tabs button[aria-selected="true"] {
+  background: rgba(255, 255, 255, 0.28);
+  font-weight: 600;
+}
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Goals */
+#goal-form {
+  display: flex;
+  gap: 6px;
+}
+#goal-input { flex: 1; }
+#goal-add-btn { padding: 4px 12px; font-size: 12px; }
+#goal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#goal-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.goal-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#goal-list li.done .goal-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.goal-date {
+  color: var(--text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.goal-delete {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+}
+.goal-delete:hover { opacity: 1; }
+
+/* Calendar */
+#cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#cal-header button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+#cal-title { font-weight: 600; }
+#cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.cal-weekday {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.cal-day {
+  position: relative;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 11px;
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+/* Focus time that day, as rising key-color intensity. */
+.cal-day.level-1 { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.cal-day.level-2 { background: color-mix(in srgb, var(--accent) 42%, transparent); }
+.cal-day.level-3 { background: color-mix(in srgb, var(--accent) 65%, transparent); }
+.cal-day.level-4 { background: color-mix(in srgb, var(--accent) 88%, transparent); }
+.cal-day.today { border-color: rgba(255, 255, 255, 0.8); }
+.cal-day.selected { outline: 2px solid #fff; outline-offset: -2px; }
+.cal-day.goal::after {
+  content: '✓';
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 8px;
+  color: #40e0d0;
+}
+#cal-day-title { font-weight: 600; }
+#cal-day-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#cal-day-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.session-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.session-note { width: 100%; }
+.goal-reached { color: #40e0d0; }

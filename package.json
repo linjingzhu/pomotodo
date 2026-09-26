@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
-    "dist:portable": "electron-builder --win portable"
+    "test": "node --test \"test/*.test.js\""
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -21,6 +21,8 @@
     "files": [
       "main.js",
       "preload.js",
+      "store.js",
+      "gcal.js",
       "renderer/**/*",
       "package.json"
     ],
@@ -30,17 +32,8 @@
     "win": {
       "icon": "renderer/icon.png",
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
       ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "artifactName": "PomodoroTimer-Setup-${version}.${ext}"
     },
     "portable": {
       "artifactName": "PomodoroTimer-Portable-${version}.${ext}"

@@ -1,6 +1,8 @@
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, Notification, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, Notification, nativeImage, dialog, shell, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const store = require('./store');
+const { createGcal, CalendarGoneError } = require('./gcal');
 
 // ---- Settings persistence (simple JSON file, no external deps) ----
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
@@ -18,6 +20,7 @@ const DEFAULT_SETTINGS = {
   backgroundTintOpacity: 0,
   accentColor: '#f2405a',
   gaugeStyle: 'pie',
+  currentTask: '',
   windowWidth: 300,
   windowHeight: 460,
   totalTurns: 0,
@@ -364,9 +367,138 @@ ipcMain.handle('background:get', () => {
 // toasts; it must match the installer's appId.
 if (process.platform === 'win32') app.setAppUserModelId('com.danielsword.pomodorotimer');
 
+// ---- History, goals and Google Calendar sync ----
+
+const RECORDS_PATH = path.join(app.getPath('userData'), 'records.json');
+
+function sendToRenderer(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+}
+
+const gcal = createGcal({
+  configFile: path.join(app.getPath('userData'), 'google-calendar.json'),
+  openExternal: (url) => shell.openExternal(url),
+  // DPAPI on Windows. Where the OS offers no encryption the token is kept
+  // in memory only (the status reports persistent: false).
+  encrypt: (text) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text).toString('base64') : null),
+  decrypt: (b64) => safeStorage.decryptString(Buffer.from(b64, 'base64')),
+  onStatus: (status) => sendToRenderer('gcal:status', status),
+});
+
+// Pushes every session and reached goal that has no event yet. Runs after
+// each change and on demand; overlapping calls fold into one extra pass.
+let syncing = false;
+let syncAgain = false;
+
+async function syncPending() {
+  if (!gcal.isConnected()) return;
+  if (syncing) {
+    syncAgain = true;
+    return;
+  }
+  syncing = true;
+  try {
+    let calendarRecreated = false;
+    do {
+      syncAgain = false;
+      try {
+        const { sessions, goals } = store.pendingSync(RECORDS_PATH);
+        for (const session of sessions) {
+          store.updateSession(RECORDS_PATH, session.id, { gcalEventId: await gcal.insertSession(session) });
+        }
+        for (const goal of goals) {
+          store.setGoalEvent(RECORDS_PATH, goal.id, await gcal.insertGoal(goal, store.localDay(goal.doneAt)));
+        }
+      } catch (e) {
+        if (!(e instanceof CalendarGoneError) || calendarRecreated) throw e;
+        // its events went with it, so replay everything into a new one
+        calendarRecreated = true;
+        store.clearEventIds(RECORDS_PATH);
+        syncAgain = true;
+      }
+    } while (syncAgain);
+    gcal.markSynced();
+  } catch (e) {
+    gcal.setError(e.message);
+  } finally {
+    syncing = false;
+  }
+}
+
+async function removeGoalEvent(goal) {
+  if (!goal || !goal.gcalEventId) return;
+  try {
+    await gcal.deleteEvent(goal.gcalEventId);
+  } catch (e) {
+    gcal.setError(e.message);
+  }
+}
+
+ipcMain.handle('records:addSession', (_evt, session) => {
+  const saved = store.addSession(RECORDS_PATH, session);
+  syncPending();
+  return saved;
+});
+
+ipcMain.handle('records:updateNote', async (_evt, { id, note }) => {
+  const session = store.updateSession(RECORDS_PATH, id, { note });
+  if (session && session.gcalEventId && gcal.isConnected()) {
+    gcal.patchSessionNote(session).catch((e) => gcal.setError(e.message));
+  }
+  return session;
+});
+
+ipcMain.handle('records:month', (_evt, month) => store.monthRecords(RECORDS_PATH, month));
+
+ipcMain.handle('goals:list', () => store.listGoals(RECORDS_PATH));
+
+ipcMain.handle('goals:add', (_evt, title) => store.addGoal(RECORDS_PATH, title));
+
+ipcMain.handle('goals:setDone', async (_evt, { id, done }) => {
+  if (!done) {
+    const before = store.listGoals(RECORDS_PATH).find((g) => g.id === id);
+    await removeGoalEvent(before);
+    store.setGoalEvent(RECORDS_PATH, id, null);
+  }
+  const goal = store.setGoalDone(RECORDS_PATH, id, done);
+  if (done) syncPending();
+  return goal;
+});
+
+ipcMain.handle('goals:delete', async (_evt, id) => {
+  const goal = store.deleteGoal(RECORDS_PATH, id);
+  await removeGoalEvent(goal);
+  return !!goal;
+});
+
+ipcMain.handle('gcal:status', () => gcal.status());
+
+ipcMain.handle('gcal:saveClient', (_evt, client) => gcal.saveClient(client));
+
+ipcMain.handle('gcal:connect', async () => {
+  try {
+    await gcal.connect();
+    await syncPending();
+  } catch (e) {
+    gcal.setError(e.message);
+  }
+  return gcal.status();
+});
+
+ipcMain.handle('gcal:disconnect', async () => {
+  await gcal.disconnect();
+  return gcal.status();
+});
+
+ipcMain.handle('gcal:syncNow', async () => {
+  await syncPending();
+  return gcal.status();
+});
+
 app.whenReady().then(() => {
   createWindow();
   createTray();
+  syncPending();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

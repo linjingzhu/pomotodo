@@ -30,7 +30,7 @@ complete a merge on its own.
 base_branch: stable
 merge_deploys: no
 runtime_gate: none
-test_command: none
+test_command: npm test
 lint_command: none
 build_command: npm run dist
 generated: none
@@ -387,6 +387,41 @@ commands → the compile and build ladder and every report; `generated` →
   Play/pause lost `.primary` and is now clear glass like reset, so the
   idle-state overrides were dropped. Both styles and persistence across
   a restart were verified under Xvfb.
+- Portable-only builds, per the user: the nsis target is dropped, and
+  the release workflow ships the Portable exe plus SHA256SUMS.
+- History, goals and Google Calendar, per the user.
+  - UX contract:
+    - Entry: the 2nd dot opens a Goals / Calendar / Settings tabbed panel.
+    - "What are you working on?" sits under the controls.
+    - A focus session is recorded when it completes, or when it is reset
+      after at least 60s of work.
+    - Goals are checkable and deletable.
+    - Calendar: a month grid shaded by focus time, and a day list whose
+      notes are editable.
+    - Empty-state hints, and Google status/error text in Settings.
+  - `store.js` holds records.json: sessions and goals, as pure functions.
+  - `gcal.js` holds OAuth for installed apps: loopback plus PKCE (S256)
+    plus state, with scope `calendar.app.created`, so it only touches its
+    own "Pomodoro Timer" calendar.
+    - The refresh token is encrypted with safeStorage (DPAPI), and kept in
+      memory only when encryption is unavailable.
+    - Sessions become timed events; reached goals become all-day events.
+      Unchecking or deleting a goal deletes its event.
+    - If the calendar was deleted, it is recreated and everything is
+      replayed.
+    - `invalid_grant` disconnects with a clear message. Apps left in
+      "Testing" get 7-day refresh tokens.
+  - main.js `syncPending()` runs after changes and at startup.
+  - The client ID and secret are pasted in-app, never committed (OA-15).
+  - `npm test` runs node:test: 13 tests for store and gcal, against a fake
+    Google plus a fake browser.
+  - E2E under Xvfb used the real main/gcal with only fetch and
+    shell.openExternal faked. The whole flow passed: task, session, goals,
+    calendar, note edit, connect, sync, note patch, un-reach deletes the
+    event, disconnect revokes.
+  - The portable build contains the new files and runs under Wine.
+  - No product-design skill exists for this user (listed and searched);
+    `.ai/UX.md` was used instead.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
