@@ -57,6 +57,9 @@ jobs:
     container: electronuserland/builder:wine
     env:
       VERSION: ${{ needs.check.outputs.version }}
+      # The mounted default HOME (/github/home) isn't owned by the container's
+      # root user, and wine refuses to create its prefix there.
+      HOME: /root
     steps:
       - uses: actions/checkout@v4
       - run: npm ci
