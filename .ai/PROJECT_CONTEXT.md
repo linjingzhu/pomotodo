@@ -427,6 +427,9 @@ commands → the compile and build ladder and every report; `generated` →
   empty space; Calendar and Settings scroll. It measured 371px on all
   three tabs under Xvfb. Also added a thin translucent scrollbar and
   bumped the version to 1.0.2.
+- Panel tabs, per the user: plain text with no pill background; the active
+  tab uses the key color (text plus 2px underline, `var(--accent)`, so it
+  turns turquoise during breaks).
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
