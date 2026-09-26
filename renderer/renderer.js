@@ -444,12 +444,56 @@
   // and position the window had before.
   el.fullscreenBtn.addEventListener('click', () => window.pomodoro.toggleFullscreen());
   el.resetSizeBtn.addEventListener('click', () => window.pomodoro.resetSize());
+  // Spots where a press or double-click means something of its own.
+  const INTERACTIVE = 'button, input, select, textarea, label, [role="button"], #settings-panel, #resize-handles';
+
   // Double-clicking the widget flips fullscreen <-> windowed, except on its
-  // controls (and the panel), where a double-click means something else.
-  // Over the drag region this never fires on Windows; main catches those.
+  // controls (and the panel).
   document.addEventListener('dblclick', (e) => {
-    if (e.target.closest('button, input, select, textarea, label, [role="button"], #settings-panel, #resize-handles')) return;
+    if (e.target.closest(INTERACTIVE)) return;
     window.pomodoro.toggleFullscreen();
+  });
+
+  // Dragging any other spot moves the window (there's no native drag
+  // region; see #app in style.css). The move only starts past a few
+  // pixels, so a click or double-click never nudges the window, and the
+  // pointer is captured then so the drag keeps up outside the window.
+  // Main refuses it while fullscreen.
+  const DRAG_SLOP_PX = 3;
+  el.app.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target.closest(INTERACTIVE)) return;
+    const startX = e.screenX;
+    const startY = e.screenY;
+    let moving = false;
+    let pending = null;
+    const flush = () => {
+      if (pending) window.pomodoro.moveBy(pending.dx, pending.dy);
+      pending = null;
+    };
+    const move = (ev) => {
+      const dx = ev.screenX - startX;
+      const dy = ev.screenY - startY;
+      if (!moving) {
+        if (Math.abs(dx) < DRAG_SLOP_PX && Math.abs(dy) < DRAG_SLOP_PX) return;
+        moving = true;
+        try { el.app.setPointerCapture(ev.pointerId); } catch (err) { /* released already */ }
+        window.pomodoro.moveStart();
+      }
+      if (!pending) requestAnimationFrame(flush);
+      pending = { dx, dy };
+    };
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      if (moving) {
+        flush();
+        window.pomodoro.moveEnd();
+      }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
   });
   // Also fires when Esc leaves fullscreen.
   window.pomodoro.onFullscreenChange((on) => {

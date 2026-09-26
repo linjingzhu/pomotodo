@@ -183,30 +183,16 @@ function createWindow() {
     if (isFullscreen()) event.preventDefault();
   });
 
-  // Double-clicking the widget flips fullscreen <-> windowed. Over the drag
-  // region Windows gives the page no mouse events at all, only a
-  // non-client double-click on the "caption" (what a drag region is), so
-  // catch that here; the renderer handles double-clicks everywhere else.
-  // Deferred so the switch doesn't run inside the window procedure.
-  if (process.platform === 'win32') {
-    mainWindow.hookWindowMessage(WM_NCLBUTTONDBLCLK, (wParam) => {
-      if (wParam.readUInt32LE(0) === HTCAPTION) setImmediate(toggleFullscreen);
-    });
-  }
-
   // The PC going to sleep pauses the timer (renderer); it stays paused.
   powerMonitor.on('suspend', () => mainWindow.webContents.send('power:suspend'));
 
   trackPointer();
 }
 
-const WM_NCLBUTTONDBLCLK = 0x00a3;
-const HTCAPTION = 2;
-
-// Windows delivers no mouse events over -webkit-app-region: drag, which is
-// most of the widget, so CSS :hover only fired over the no-drag ring and
-// buttons. Poll the cursor here and tell the renderer when it's over the
-// window instead.
+// Tells the renderer when the cursor is over the window, to reveal the
+// corner dots. Polled because the widget used to be a drag region, which
+// on Windows gets no mouse events (so no CSS :hover); kept as it also
+// covers the window's transparent margin.
 function trackPointer() {
   let inside = false;
   const timer = setInterval(() => {
@@ -305,6 +291,27 @@ ipcMain.on('window:progress', (_evt, { state, fraction, label } = {}) => {
     mainWindow.setProgressBar(Math.min(1, Math.max(0, fraction)), { mode: state === 'paused' ? 'paused' : 'normal' });
   }
   if (tray && typeof label === 'string') tray.setToolTip(label.slice(0, 120));
+});
+
+// Moving the window. The widget has no native drag region: on Windows a
+// drag region hides every mouse event from the page (double-clicks
+// included, which the fullscreen toggle needs), so the renderer drags the
+// window through here instead. dx/dy are the pointer's movement in screen
+// DIPs since the drag began. Refused while fullscreen (the window is
+// locked in place then).
+let moveFrom = null;
+
+ipcMain.on('window:moveStart', () => {
+  moveFrom = isFullscreen() ? null : mainWindow.getPosition();
+});
+
+ipcMain.on('window:moveBy', (_evt, { dx, dy } = {}) => {
+  if (!moveFrom || isFullscreen() || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
+  mainWindow.setPosition(Math.round(moveFrom[0] + dx), Math.round(moveFrom[1] + dy));
+});
+
+ipcMain.on('window:moveEnd', () => {
+  moveFrom = null;
 });
 
 // Electron documents transparent windows as not resizable, and on Windows
