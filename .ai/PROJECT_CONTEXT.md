@@ -575,6 +575,27 @@ commands → the compile and build ladder and every report; `generated` →
     keeping the top-left corner on screen (grown again if the panel is
     open). It works while size-locked, and from fullscreen it returns to
     windowed mode at the default size.
+- 1.0.8: double-click toggling didn't work on real Windows (user
+  report). The WM_NCLBUTTONDBLCLK hook over the drag region (unverified
+  in 1.0.5) never fired there. Wine couldn't show why: in a Wine virtual
+  desktop the transparent BrowserWindow constructor never returned.
+  - Fix: no native drag region at all (`#app` is `no-drag`). The renderer
+    moves the window (`window:moveStart/moveBy/moveEnd`, like the resize
+    handles), starting only past a 3px slop and capturing the pointer
+    then. Every click now reaches the page, so the page `dblclick`
+    toggle (verified) covers the whole widget; the hook is removed.
+    Main refuses moves while fullscreen.
+  - Nothing lost: Aero Snap already couldn't apply to a non-resizable
+    window.
+  - Lesson: a Windows-only path that can't be exercised here is a bet.
+    Prefer designs whose behavior is testable in the page.
+  - Also in 1.0.8, per the user: the background image is copied into
+    userData as `background.<ext>` (`backgroundImageFile`; temp copy,
+    then rename; other `background.*` removed). Moving or deleting the
+    original no longer loses it, and Clear deletes the copy. The old
+    `backgroundImagePath` is migrated on the first `background:get`
+    while the original still exists; if it's gone, the setting is left
+    alone.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

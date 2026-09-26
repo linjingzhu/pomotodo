@@ -17,7 +17,8 @@ const DEFAULT_SETTINGS = {
   closeToTray: false,
   sizeLocked: false,
   notifyOnPhaseChange: true,
-  backgroundImagePath: null,
+  backgroundImageFile: null, // the app's own copy, in the userData folder
+  backgroundImagePath: null, // before 1.0.8: the original file's path
   backgroundBlur: 0,
   backgroundTintColor: '#15161e',
   backgroundTintOpacity: 0,
@@ -39,8 +40,8 @@ const IMAGE_MIME_TYPES = {
   '.bmp': 'image/bmp',
 };
 
-// Settings only ever store the file path; the data URL is rebuilt on demand
-// so settings.json stays small and always reflects the file's current bytes.
+// Settings only ever store a file name; the data URL is rebuilt on demand
+// so settings.json stays small.
 function imageFileToDataUrl(filePath) {
   const mime = IMAGE_MIME_TYPES[path.extname(filePath).toLowerCase()];
   if (!mime) return null;
@@ -183,30 +184,16 @@ function createWindow() {
     if (isFullscreen()) event.preventDefault();
   });
 
-  // Double-clicking the widget flips fullscreen <-> windowed. Over the drag
-  // region Windows gives the page no mouse events at all, only a
-  // non-client double-click on the "caption" (what a drag region is), so
-  // catch that here; the renderer handles double-clicks everywhere else.
-  // Deferred so the switch doesn't run inside the window procedure.
-  if (process.platform === 'win32') {
-    mainWindow.hookWindowMessage(WM_NCLBUTTONDBLCLK, (wParam) => {
-      if (wParam.readUInt32LE(0) === HTCAPTION) setImmediate(toggleFullscreen);
-    });
-  }
-
   // The PC going to sleep pauses the timer (renderer); it stays paused.
   powerMonitor.on('suspend', () => mainWindow.webContents.send('power:suspend'));
 
   trackPointer();
 }
 
-const WM_NCLBUTTONDBLCLK = 0x00a3;
-const HTCAPTION = 2;
-
-// Windows delivers no mouse events over -webkit-app-region: drag, which is
-// most of the widget, so CSS :hover only fired over the no-drag ring and
-// buttons. Poll the cursor here and tell the renderer when it's over the
-// window instead.
+// Tells the renderer when the cursor is over the window, to reveal the
+// corner dots. Polled because the widget used to be a drag region, which
+// on Windows gets no mouse events (so no CSS :hover); kept as it also
+// covers the window's transparent margin.
 function trackPointer() {
   let inside = false;
   const timer = setInterval(() => {
@@ -305,6 +292,27 @@ ipcMain.on('window:progress', (_evt, { state, fraction, label } = {}) => {
     mainWindow.setProgressBar(Math.min(1, Math.max(0, fraction)), { mode: state === 'paused' ? 'paused' : 'normal' });
   }
   if (tray && typeof label === 'string') tray.setToolTip(label.slice(0, 120));
+});
+
+// Moving the window. The widget has no native drag region: on Windows a
+// drag region hides every mouse event from the page (double-clicks
+// included, which the fullscreen toggle needs), so the renderer drags the
+// window through here instead. dx/dy are the pointer's movement in screen
+// DIPs since the drag began. Refused while fullscreen (the window is
+// locked in place then).
+let moveFrom = null;
+
+ipcMain.on('window:moveStart', () => {
+  moveFrom = isFullscreen() ? null : mainWindow.getPosition();
+});
+
+ipcMain.on('window:moveBy', (_evt, { dx, dy } = {}) => {
+  if (!moveFrom || isFullscreen() || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
+  mainWindow.setPosition(Math.round(moveFrom[0] + dx), Math.round(moveFrom[1] + dy));
+});
+
+ipcMain.on('window:moveEnd', () => {
+  moveFrom = null;
 });
 
 // Electron documents transparent windows as not resizable, and on Windows
@@ -544,6 +552,36 @@ ipcMain.handle('notify', (_evt, { title, body }) => {
 
 ipcMain.handle('notify:close', () => closePhaseNotification());
 
+// The background image is copied into the app's own folder (next to
+// settings.json) as background.<ext>, so moving or deleting the original
+// doesn't lose it. One copy at a time: picking another replaces it, and
+// Clear deletes it.
+function removeStoredBackgrounds(keep) {
+  for (const ext of Object.keys(IMAGE_MIME_TYPES)) {
+    const name = `background${ext}`;
+    if (name === keep) continue;
+    try {
+      fs.unlinkSync(path.join(app.getPath('userData'), name));
+    } catch (e) {
+      // not there
+    }
+  }
+}
+
+function storeBackgroundImage(sourcePath) {
+  const ext = path.extname(sourcePath).toLowerCase();
+  if (!IMAGE_MIME_TYPES[ext]) return null;
+  const dir = app.getPath('userData');
+  fs.mkdirSync(dir, { recursive: true });
+  const name = `background${ext}`;
+  const tmp = path.join(dir, `${name}.tmp`);
+  fs.copyFileSync(sourcePath, tmp); // copied aside, then swapped in
+  removeStoredBackgrounds(name);
+  fs.renameSync(tmp, path.join(dir, name));
+  saveSettings({ backgroundImageFile: name, backgroundImagePath: null });
+  return name;
+}
+
 ipcMain.handle('background:pick', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Choose background image',
@@ -551,11 +589,10 @@ ipcMain.handle('background:pick', async () => {
     filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
   });
   if (result.canceled || !result.filePaths[0]) return null;
-  const filePath = result.filePaths[0];
   try {
-    const dataUrl = imageFileToDataUrl(filePath);
+    const dataUrl = imageFileToDataUrl(result.filePaths[0]);
     if (!dataUrl) return null;
-    saveSettings({ backgroundImagePath: filePath });
+    storeBackgroundImage(result.filePaths[0]);
     return { dataUrl };
   } catch (e) {
     return null;
@@ -563,14 +600,24 @@ ipcMain.handle('background:pick', async () => {
 });
 
 ipcMain.handle('background:clear', () => {
-  saveSettings({ backgroundImagePath: null });
+  removeStoredBackgrounds(null);
+  saveSettings({ backgroundImageFile: null, backgroundImagePath: null });
 });
 
 ipcMain.handle('background:get', () => {
-  const { backgroundImagePath } = loadSettings();
-  if (!backgroundImagePath) return null;
+  let { backgroundImageFile: name, backgroundImagePath: original } = loadSettings();
+  // Before 1.0.8 only the original's path was kept: take a copy now, while
+  // it's still there (if it's gone, the setting is left for a later try).
+  if (!name && original) {
+    try {
+      name = storeBackgroundImage(original);
+    } catch (e) {
+      return null;
+    }
+  }
+  if (!name) return null;
   try {
-    const dataUrl = imageFileToDataUrl(backgroundImagePath);
+    const dataUrl = imageFileToDataUrl(path.join(app.getPath('userData'), path.basename(name)));
     return dataUrl ? { dataUrl } : null;
   } catch (e) {
     return null;
