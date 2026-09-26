@@ -329,6 +329,20 @@ commands → the compile and build ladder and every report; `generated` →
       `%LOCALAPPDATA%\Programs\Pomodoro Timer` with shortcuts and an
       uninstaller.
     - The installed exe opens a 300x460 window under Wine.
+- GitHub Releases, per the user, via Actions (the session has no release
+  API). The user's rule is that Actions must never cost money.
+  `.github/workflows/release.yml` keeps to that:
+  - ubuntu-latest only, with the Windows build in the
+    `electronuserland/builder:wine` container. Windows runners bill 2x.
+  - Triggered only by changes to package.json or the workflow, or by
+    hand.
+  - A 1-minute `check` job skips the build when release `v<version>`
+    already exists.
+  - Timeouts of 3 and 25 minutes.
+  - No upload-artifact.
+  - Ships the Setup exe, the Portable exe and SHA256SUMS.txt.
+  - The repo is private, so release downloads need a signed-in account
+    with access.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

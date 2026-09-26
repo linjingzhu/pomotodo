@@ -1,0 +1,84 @@
+# Builds the Windows installer and portable exe and publishes them as a
+# GitHub Release named after package.json's version.
+#
+# Kept inside the free Actions allowance:
+# - Linux runners only (Windows runners bill minutes at 2x); the Windows
+#   build runs under Wine in electron-builder's own image.
+# - Runs only when package.json or this file changes, or when started by
+#   hand, and the build job is skipped outright when the release for the
+#   current version already exists - bump "version" to release again.
+# - Hard time limits, no workflow artifacts (those use billed storage;
+#   release assets don't).
+name: Release
+
+on:
+  push:
+    branches: [stable, jeongsu/festive-fermat-p6igdu]
+    paths: [package.json, .github/workflows/release.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      exists: ${{ steps.exists.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+      - id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - id: exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.exists == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container: electronuserland/builder:wine
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npx electron-builder --win --x64 --publish never
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum "PomodoroTimer-Setup-$VERSION.exe" "PomodoroTimer-Portable-$VERSION.exe" > SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: Pomodoro Timer ${{ env.VERSION }}
+          make_latest: true
+          files: |
+            dist/PomodoroTimer-Setup-${{ env.VERSION }}.exe
+            dist/PomodoroTimer-Portable-${{ env.VERSION }}.exe
+            dist/SHA256SUMS.txt
+          body: |
+            Windows 10/11 (64-bit)용 뽀모도로 타이머.
+
+            - **PomodoroTimer-Setup-${{ env.VERSION }}.exe**: 설치형. 관리자 권한 없이 설치, 바탕화면·시작 메뉴 바로가기와 제거 프로그램 포함.
+            - **PomodoroTimer-Portable-${{ env.VERSION }}.exe**: 설치 없이 바로 실행.
+            - **SHA256SUMS.txt**: 다운로드 파일 확인용 체크섬.
+
+            코드 서명이 없어 처음 실행할 때 "Windows의 PC 보호" 창이 뜨면 **추가 정보 → 실행**을 누르세요.
