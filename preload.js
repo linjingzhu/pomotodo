@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('pomodoro', {
   resizeStart: () => ipcRenderer.send('window:resizeStart'),
   resizeMove: (edge, dx, dy) => ipcRenderer.send('window:resizeMove', { edge, dx, dy }),
   resizeEnd: () => ipcRenderer.send('window:resizeEnd'),
+  onSuspend: (callback) => ipcRenderer.on('power:suspend', () => callback()),
   onFullscreenChange: (callback) => ipcRenderer.on('window:fullscreen', (_evt, on) => callback(on)),
   setMinimizeToTray: (flag) => ipcRenderer.invoke('window:setMinimizeToTray', flag),
   setCloseToTray: (flag) => ipcRenderer.invoke('window:setCloseToTray', flag),

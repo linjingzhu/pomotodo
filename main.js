@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, Notification, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, Notification, nativeImage, dialog, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const store = require('./store');
@@ -57,7 +57,11 @@ function saveSettings(partial) {
   const merged = { ...loadSettings(), ...partial };
   try {
     fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
-    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(merged, null, 2), 'utf-8');
+    // Written aside, then swapped in: a crash or power loss mid-write can't
+    // leave a truncated file, which would reset every setting and total.
+    const tmp = `${SETTINGS_PATH}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(merged, null, 2), 'utf-8');
+    fs.renameSync(tmp, SETTINGS_PATH);
   } catch (e) {
     // best effort; ignore write failures
   }
@@ -110,6 +114,10 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Keep the timer's ticks on time while the window is hidden in the
+      // tray or minimized, so a phase ends (and notifies) when it should.
+      // The renderer keeps time by the clock either way.
+      backgroundThrottling: false,
     },
   });
 
@@ -174,6 +182,9 @@ function createWindow() {
       if (wParam.readUInt32LE(0) === HTCAPTION) setImmediate(toggleFullscreen);
     });
   }
+
+  // The PC going to sleep pauses the timer (renderer); it stays paused.
+  powerMonitor.on('suspend', () => mainWindow.webContents.send('power:suspend'));
 
   trackPointer();
 }

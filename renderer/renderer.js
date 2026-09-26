@@ -38,9 +38,21 @@
 
 
   let mode = 'work'; // 'work' | 'break'
-  let remainingSec = 25 * 60;
+  // Time is kept by the wall clock, not by counting ticks: a hidden or
+  // minimized window's timers can be throttled to one wake-up a minute,
+  // which made a tick-counting timer all but stop in the tray. Ticks only
+  // sample the clock.
+  let remainingMs = 25 * 60 * 1000;
+  let phaseEndAt = 0; // while running: when the current phase ends (ms)
+  let lastTickAt = 0; // while running: the clock time already accounted for
+  let workCarryMs = 0; // focus time not yet credited as a whole second
   let timerId = null;
   let running = false;
+  const TICK_MS = 250;
+  // Ticks this far apart mean the PC was asleep (the suspend event can be
+  // missed); that gap isn't counted, and the timer pauses. Well above the
+  // one-minute throttling a hidden window can still get.
+  const SLEEP_GAP_MS = 3 * 60 * 1000;
   let userAccentColor = '#f2405a';
   const BREAK_ACCENT_COLOR = '#40e0d0'; // turquoise
   let totalTurns = 0; // completed work sessions, persisted
@@ -60,16 +72,16 @@
 
   function timerState() {
     if (running) return 'running';
-    return remainingSec === currentDurationSec() ? 'idle' : 'paused';
+    return remainingMs === currentDurationSec() * 1000 ? 'idle' : 'paused';
   }
 
   function render() {
     const state = timerState();
     el.app.dataset.state = state;
-    el.timerDisplay.textContent = fmt(remainingSec);
+    el.timerDisplay.textContent = fmt(Math.ceil(remainingMs / 1000));
     el.startPauseBtn.classList.toggle('running', running);
     el.startPauseBtn.title = running ? 'Pause' : 'Start';
-    const remainingFraction = remainingSec / currentDurationSec();
+    const remainingFraction = remainingMs / (currentDurationSec() * 1000);
     // The arc spans [start, 360deg]; start advancing clockwise from 12
     // o'clock is the depleted portion growing clockwise.
     el.ringFill.style.setProperty('--ring-start', `${360 * (1 - remainingFraction)}deg`);
@@ -129,9 +141,9 @@
   }
 
   function resetTimer() {
-    if (mode === 'work') finishSession(false);
     stopTick();
-    remainingSec = currentDurationSec();
+    if (mode === 'work') finishSession(false);
+    remainingMs = currentDurationSec() * 1000;
     running = false;
     render();
   }
@@ -162,6 +174,7 @@
   function finishSession(completed) {
     const done = session;
     session = null;
+    workCarryMs = 0;
     if (!done || (!completed && done.workedSec < MIN_RECORDED_SEC)) return;
     window.pomodoro.addSession({
       start: done.start,
@@ -179,7 +192,7 @@
     }
     mode = mode === 'work' ? 'break' : 'work';
     saveStats();
-    remainingSec = currentDurationSec();
+    remainingMs = currentDurationSec() * 1000;
     applyModeColor();
     // `mode` is already the phase that's starting.
     const title = mode === 'work' ? 'Break is over' : 'Focus time is over';
@@ -191,38 +204,73 @@
     playPhaseSweep();
   }
 
-  function tick() {
-    if (mode === 'work') {
-      if (!session) session = { start: new Date(Date.now() - 1000).toISOString(), workedSec: 0 };
-      session.workedSec += 1;
-      totalStudySeconds += 1;
-      // Batched so a running timer doesn't rewrite settings.json every second;
-      // at most this many seconds are lost if the app is killed outright.
-      if (++unsavedStudySeconds >= 10) saveStats();
-    }
-    remainingSec -= 1;
-    if (remainingSec <= 0) {
+  // Credits focus time in whole seconds; the remainder carries over.
+  function creditWork(ms) {
+    if (ms <= 0) return;
+    if (!session) session = { start: new Date(lastTickAt).toISOString(), workedSec: 0 };
+    workCarryMs += ms;
+    const whole = Math.floor(workCarryMs / 1000);
+    workCarryMs -= whole * 1000;
+    session.workedSec += whole;
+    totalStudySeconds += whole;
+    unsavedStudySeconds += whole;
+    // Batched so a running timer doesn't rewrite settings.json every second;
+    // at most this many seconds are lost if the app is killed outright.
+    if (unsavedStudySeconds >= 10) saveStats();
+  }
+
+  // Accounts for the clock up to `now`, switching phases as they end. Each
+  // new phase starts exactly where the last one ended, so a late tick
+  // shifts nothing.
+  function advanceTo(now) {
+    for (;;) {
+      const upTo = Math.min(now, phaseEndAt);
+      if (mode === 'work') creditWork(upTo - lastTickAt);
+      lastTickAt = upTo;
+      if (now < phaseEndAt) break;
       switchMode();
+      phaseEndAt = upTo + remainingMs;
     }
+    remainingMs = phaseEndAt - now;
+  }
+
+  function tick() {
+    const now = Date.now();
+    if (now - lastTickAt > SLEEP_GAP_MS) {
+      pauseAt(lastTickAt);
+      return;
+    }
+    advanceTo(now);
     render();
   }
 
   function startTick() {
     if (timerId) return;
     running = true;
-    timerId = setInterval(tick, 1000);
+    lastTickAt = Date.now();
+    phaseEndAt = lastTickAt + remainingMs;
+    timerId = setInterval(tick, TICK_MS);
     render();
   }
 
-  function stopTick() {
+  // Stops the clock as of `at` (now, or the last tick before a sleep).
+  function pauseAt(at) {
     if (timerId) {
       clearInterval(timerId);
       timerId = null;
+      advanceTo(at);
     }
     if (unsavedStudySeconds > 0) saveStats();
     running = false;
     render();
   }
+
+  function stopTick() {
+    pauseAt(Date.now());
+  }
+
+  // The PC going to sleep pauses the timer; it stays paused after waking.
+  window.pomodoro.onSuspend(() => stopTick());
 
   el.startPauseBtn.addEventListener('click', () => {
     window.pomodoro.closeNotification();
@@ -245,7 +293,7 @@
     session = null;
     mode = 'work';
     applyModeColor();
-    remainingSec = currentDurationSec();
+    remainingMs = currentDurationSec() * 1000;
     totalTurns = 0;
     totalStudySeconds = 0;
     saveStats();
@@ -508,7 +556,7 @@
     refreshGoalCheck();
     totalTurns = settings.totalTurns;
     totalStudySeconds = settings.totalStudySeconds;
-    remainingSec = settings.workMinutes * 60;
+    remainingMs = currentDurationSec() * 1000;
     render();
     await populateDisplays();
   }

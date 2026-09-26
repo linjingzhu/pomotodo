@@ -526,6 +526,18 @@ commands → the compile and build ladder and every report; `generated` →
     Not verifiable here: Xvfb has no WM, so a "fullscreen" X window keeps
     its old geometry, and under Wine xdotool input never reached the app
     window. The page path was checked with sendInputEvent.
+  - Timer bug found in research: it counted one second per
+    `setInterval` tick, and a hidden window's timers are throttled
+    (Chromium intensive throttling; `backgroundThrottling` was on), so in
+    the tray it ran about 1 second per minute (measured: 7 minutes hidden
+    = 5 seconds). Now it keeps time by the wall clock (`phaseEndAt`,
+    `advanceTo` crediting focus time in whole seconds with a carry; each
+    new phase starts where the last ended), ticks every 250ms, and
+    `backgroundThrottling: false` keeps phase ends on time.
+    `powerMonitor` 'suspend' pauses it (it stays paused, per the user);
+    a gap of more than 3 minutes between ticks is treated as a missed
+    suspend: not credited, and paused. settings.json is now written to a
+    temp file and renamed, like records.json.
   - Focused text, number and select fields drop the browser focus ring
     (orange on Windows, drawn outside the box and clipped by the
     scrolling panel) for a brighter border. Select options get a dark
