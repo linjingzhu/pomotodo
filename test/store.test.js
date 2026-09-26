@@ -36,6 +36,16 @@ test('goals: add, reach, un-reach, order, delete', () => {
   assert.deepStrictEqual(store.listGoals(file).map((g) => g.id), [a.id]);
 });
 
+test('adding an open goal that already exists (any case) reuses it', () => {
+  const file = tempFile();
+  const a = store.addGoal(file, 'Read chapter 5');
+  assert.strictEqual(store.addGoal(file, '  read CHAPTER 5 ').id, a.id);
+  assert.strictEqual(store.listGoals(file).length, 1);
+  store.setGoalDone(file, a.id, true);
+  assert.notStrictEqual(store.addGoal(file, 'Read chapter 5').id, a.id, 'a reached goal does not block a new one');
+  assert.strictEqual(store.listGoals(file).length, 2);
+});
+
 test('a missing or corrupt file reads as empty', () => {
   const file = tempFile();
   assert.deepStrictEqual(store.load(file), { sessions: [], goals: [] });

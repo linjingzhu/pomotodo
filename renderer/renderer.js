@@ -340,11 +340,24 @@
     window.dispatchEvent(new CustomEvent('panel-toggled', { detail: panelOpen }));
   });
 
+  // The session's goal. Enter confirms it and adds it to the Goals list;
+  // picking a goal in that list sets it here (panel.js).
   el.taskInput.addEventListener('change', () => {
     window.pomodoro.saveSettings({ currentTask: el.taskInput.value.trim() });
+    window.dispatchEvent(new Event('task-changed'));
   });
-  el.taskInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') el.taskInput.blur();
+  el.taskInput.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter') return;
+    const title = el.taskInput.value.trim();
+    el.taskInput.blur();
+    if (!title) return;
+    const goal = await window.pomodoro.addGoal(title);
+    // an existing goal matched case-insensitively: show its exact title
+    if (goal && goal.title !== title) {
+      el.taskInput.value = goal.title;
+      el.taskInput.dispatchEvent(new Event('change'));
+    }
+    window.dispatchEvent(new Event('goals-changed'));
   });
 
   el.cornerButtons.forEach((btn) => {

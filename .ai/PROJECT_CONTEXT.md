@@ -481,6 +481,16 @@ commands → the compile and build ladder and every report; `generated` →
   - The renderer is told of changes via `window:fullscreen` (button title,
     class).
   - Version 1.0.4.
+- The timer's goal field is synced with the Goals list, per the user.
+  - Enter in `#task-input` adds the text as a goal. `store.addGoal` now
+    reuses an open goal with the same title, case-insensitively, and the
+    field is then normalized to that goal's title.
+  - Clicking a goal title (or Enter/Space on it) in the Goals tab sets it
+    as the timer's goal. The current goal is highlighted in the key
+    color.
+  - Events: `goals-changed` and `task-changed` keep the list fresh.
+  - The placeholder is now "Goal for this session".
+  - E2E under Xvfb used real typing: insertText plus an Enter keydown.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

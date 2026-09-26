@@ -68,8 +68,27 @@
       await api.deleteGoal(goal.id);
       loadGoals();
     });
-    const title = make('span', { className: 'goal-title', textContent: goal.title });
-    return make('li', { className: goal.doneAt ? 'done' : '' }, [check, title, when, remove]);
+    const current = $('task-input').value.trim().toLowerCase() === goal.title.toLowerCase();
+    const title = make('span', {
+      className: 'goal-title',
+      textContent: goal.title,
+      tabIndex: 0,
+      title: current ? 'Current goal on the timer' : 'Set as the timer\'s goal',
+    });
+    title.setAttribute('role', 'button');
+    const select = () => {
+      $('task-input').value = goal.title;
+      $('task-input').dispatchEvent(new Event('change'));
+    };
+    title.addEventListener('click', select);
+    title.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        select();
+      }
+    });
+    const classes = [goal.doneAt ? 'done' : '', current ? 'current' : ''].filter(Boolean).join(' ');
+    return make('li', { className: classes }, [check, title, when, remove]);
   }
 
   $('goal-form').addEventListener('submit', async (e) => {
@@ -167,6 +186,11 @@
     viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1);
     loadMonth();
   });
+
+  // Keep the list in step with the timer's goal field.
+  ['goals-changed', 'task-changed'].forEach((name) => window.addEventListener(name, () => {
+    if (activeTab === 'goals') loadGoals();
+  }));
 
   window.addEventListener('session-recorded', () => {
     if (activeTab === 'calendar') loadMonth();
