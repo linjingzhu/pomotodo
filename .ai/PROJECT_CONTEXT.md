@@ -30,7 +30,7 @@ complete a merge on its own.
 base_branch: stable
 merge_deploys: no
 runtime_gate: none
-test_command: none
+test_command: npm test
 lint_command: none
 build_command: npm run dist
 generated: none
@@ -360,6 +360,68 @@ commands → the compile and build ladder and every report; `generated` →
   - Dropped the feature branch from the triggers.
   - Lesson: read REPOSITORY.md before adding any automation, not at merge
     time.
+- Real Windows screenshot, after the merge: the corner dots only appeared
+  over the ring, and the stats' second row and Reset were cut off below
+  the window edge.
+  - Cause of the hover bug: Windows sends no mouse events over
+    `-webkit-app-region: drag`, so CSS :hover only fired on the no-drag
+    ring. Fix: main.js polls `screen.getCursorScreenPoint()` against the
+    window bounds every 120ms and sends `window:pointer`; the renderer
+    toggles `#app.pointer-inside`.
+  - Cause of the clipping: main had a fixed content height. Fix: main is
+    now a size container. The ring is
+    `clamp(96px, min(100cqw, 100cqh - 158px), 190px)`, and the digits
+    and the ring mask scale with it (the mask now uses percentages).
+    Watch out: cq units measure the content box, so padding is not part
+    of the reserve.
+  - Stats now span the ring's width (label at its left edge, value at
+    its right edge, per the user's mockup), are at least 176px wide, and
+    have 14px above Reset. The settings panel is capped at 48% and
+    scrolls.
+  - Verified under Xvfb at 300x460, 320x380, 260x330 and with settings
+    open. xdotool hover over a drag area toggles the dots on and off.
+- Gauge: the default is now a filled pie (the same conic gradient, masked
+  to a disc out to the track's outer edge, 85% alpha at the moving edge
+  so the digits stay readable). Settings > Gauge style switches between
+  `pie` and `stroke` via `#app[data-gauge]`, persisted as `gaugeStyle`.
+  Play/pause lost `.primary` and is now clear glass like reset, so the
+  idle-state overrides were dropped. Both styles and persistence across
+  a restart were verified under Xvfb.
+- Portable-only builds, per the user: the nsis target is dropped, and
+  the release workflow ships the Portable exe plus SHA256SUMS.
+- History, goals and Google Calendar, per the user.
+  - UX contract:
+    - Entry: the 2nd dot opens a Goals / Calendar / Settings tabbed panel.
+    - "What are you working on?" sits under the controls.
+    - A focus session is recorded when it completes, or when it is reset
+      after at least 60s of work.
+    - Goals are checkable and deletable.
+    - Calendar: a month grid shaded by focus time, and a day list whose
+      notes are editable.
+    - Empty-state hints, and Google status/error text in Settings.
+  - `store.js` holds records.json: sessions and goals, as pure functions.
+  - `gcal.js` holds OAuth for installed apps: loopback plus PKCE (S256)
+    plus state, with scope `calendar.app.created`, so it only touches its
+    own "Pomodoro Timer" calendar.
+    - The refresh token is encrypted with safeStorage (DPAPI), and kept in
+      memory only when encryption is unavailable.
+    - Sessions become timed events; reached goals become all-day events.
+      Unchecking or deleting a goal deletes its event.
+    - If the calendar was deleted, it is recreated and everything is
+      replayed.
+    - `invalid_grant` disconnects with a clear message. Apps left in
+      "Testing" get 7-day refresh tokens.
+  - main.js `syncPending()` runs after changes and at startup.
+  - The client ID and secret are pasted in-app, never committed (OA-15).
+  - `npm test` runs node:test: 13 tests for store and gcal, against a fake
+    Google plus a fake browser.
+  - E2E under Xvfb used the real main/gcal with only fetch and
+    shell.openExternal faked. The whole flow passed: task, session, goals,
+    calendar, note edit, connect, sync, note patch, un-reach deletes the
+    event, disconnect revokes.
+  - The portable build contains the new files and runs under Wine.
+  - No product-design skill exists for this user (listed and searched);
+    `.ai/UX.md` was used instead.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

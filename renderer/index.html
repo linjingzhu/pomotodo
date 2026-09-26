@@ -12,7 +12,7 @@
     <div id="bg-tint"></div>
     <div class="titlebar-actions">
       <button id="close-btn" title="Close"></button>
-      <button id="gear-btn" title="Settings"></button>
+      <button id="gear-btn" title="Goals · Calendar · Settings"></button>
       <button id="pin-btn" title="Lock window size" aria-pressed="false"></button>
       <button id="fullscreen-btn" title="Fullscreen"></button>
     </div>
@@ -26,7 +26,7 @@
         <div id="timer-display">25:00</div>
       </div>
       <div id="controls">
-        <button id="start-pause-btn" class="primary" title="Start">
+        <button id="start-pause-btn" title="Start">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
             <path id="play-icon" d="M4 2.5 L13 8 L4 13.5 Z" />
             <g id="pause-icon">
@@ -42,6 +42,8 @@
           </svg>
         </button>
       </div>
+      <input id="task-input" type="text" maxlength="120" placeholder="What are you working on?"
+             title="Saved with each focus session and shown in the Calendar tab" />
       <div id="stats">
         <div class="stat-row"><span>Total turns</span><span id="total-turns">0</span></div>
         <div class="stat-row"><span>Total study time</span><span id="total-study">0m</span></div>
@@ -50,6 +52,36 @@
     </main>
 
     <section id="settings-panel" class="hidden">
+      <nav id="panel-tabs" role="tablist">
+        <button role="tab" id="tab-btn-goals" data-tab="goals" aria-selected="true">Goals</button>
+        <button role="tab" id="tab-btn-calendar" data-tab="calendar" aria-selected="false">Calendar</button>
+        <button role="tab" id="tab-btn-settings" data-tab="settings" aria-selected="false">Settings</button>
+      </nav>
+
+      <div id="tab-goals" class="tab" role="tabpanel" aria-labelledby="tab-btn-goals">
+        <form id="goal-form">
+          <input id="goal-input" type="text" maxlength="200" placeholder="Add a goal" />
+          <button type="submit" id="goal-add-btn">Add</button>
+        </form>
+        <p id="goals-empty" class="hint">Set a goal, then tick it off when you reach it. Reached goals also appear on that day in the Calendar tab.</p>
+        <ul id="goal-list"></ul>
+      </div>
+
+      <div id="tab-calendar" class="tab hidden" role="tabpanel" aria-labelledby="tab-btn-calendar">
+        <div id="cal-header">
+          <button id="cal-prev" title="Previous month" aria-label="Previous month">&lsaquo;</button>
+          <span id="cal-title"></span>
+          <button id="cal-next" title="Next month" aria-label="Next month">&rsaquo;</button>
+        </div>
+        <div id="cal-grid"></div>
+        <div id="cal-day">
+          <div id="cal-day-title"></div>
+          <ul id="cal-day-list"></ul>
+          <p id="cal-day-empty" class="hint">No focus sessions on this day. Finished sessions are recorded automatically, with what you were working on.</p>
+        </div>
+      </div>
+
+      <div id="tab-settings" class="tab hidden" role="tabpanel" aria-labelledby="tab-btn-settings">
       <div class="row">
         <label for="work-min">Work (min)</label>
         <input type="number" id="work-min" min="1" max="180" value="25" />
@@ -113,9 +145,37 @@
         <label for="accent-color">Key color (work; break is always turquoise)</label>
         <input type="color" id="accent-color" />
       </div>
+      <div class="row">
+        <label for="gauge-style">Gauge style</label>
+        <select id="gauge-style">
+          <option value="pie">Filled pie</option>
+          <option value="stroke">Stroke</option>
+        </select>
+      </div>
+      <hr />
+      <div class="section-title">Google Calendar</div>
+      <p id="gcal-status" class="hint" aria-live="polite"></p>
+      <div id="gcal-setup">
+        <p class="hint">One-time setup: in Google Cloud Console, enable the Google Calendar API and create an OAuth client of type <b>Desktop app</b>. Paste its ID and secret here, then Connect. The app only gets access to its own "Pomodoro Timer" calendar.</p>
+        <div class="row">
+          <label for="gcal-client-id">Client ID</label>
+          <input id="gcal-client-id" type="text" spellcheck="false" />
+        </div>
+        <div class="row">
+          <label for="gcal-client-secret">Client secret</label>
+          <input id="gcal-client-secret" type="password" spellcheck="false" />
+        </div>
+      </div>
+      <div class="button-group" id="gcal-actions">
+        <button id="gcal-connect-btn">Connect</button>
+        <button id="gcal-sync-btn">Sync now</button>
+        <button id="gcal-disconnect-btn">Disconnect</button>
+      </div>
+      </div>
     </section>
   </div>
 
   <script src="renderer.js"></script>
+  <script src="panel.js"></script>
 </body>
 </html>

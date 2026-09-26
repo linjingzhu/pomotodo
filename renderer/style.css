@@ -104,6 +104,7 @@ html, body {
   -webkit-app-region: no-drag;
 }
 #app:hover .titlebar-actions,
+#app.pointer-inside .titlebar-actions,
 .titlebar-actions:focus-within {
   opacity: 1;
 }
@@ -144,20 +145,36 @@ html, body {
   border: none;
 }
 
+/* A size container, so the ring can shrink to whatever height is left
+   instead of pushing the stats and their Reset below the window edge. */
 main {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
+  container-type: size;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 24px;
+  gap: 14px;
+  padding: 16px 24px 22px;
+}
+
+/* Ring diameter, shared with #task-input and #stats so they span exactly
+   the ring's width. cq units measure main's content box; 198px = three
+   14px gaps + 58px controls + 26px task input + 70px stats block, with 2px
+   spare. Declared on the children (not on main) because cq units resolve
+   against an ancestor. */
+#timer-ring,
+#task-input,
+#stats {
+  --ring: clamp(96px, min(100cqw, 100cqh - 198px), 190px);
 }
 
 #timer-ring {
   position: relative;
-  width: 190px;
-  height: 190px;
+  flex-shrink: 0;
+  width: var(--ring);
+  height: var(--ring);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,10 +195,11 @@ main {
   stroke-width: 3;
 }
 
-/* Progress arc: a conic gradient masked to the ring's shape, so the color
-   can run along the arc - an SVG stroke can't. The moving end (the current
-   moment) is the full key color; toward the fixed 12 o'clock end it drifts
-   to a neighbouring hue and fades. Angles are registered properties so the
+/* Progress pie: a conic gradient masked to a disc (the track circle's
+   outer edge) and to the remaining sector, so the whole inside of the
+   circle fills. The moving edge (the current moment) is the key color;
+   toward the fixed 12 o'clock edge it drifts to a neighbouring hue and
+   fades. Slightly translucent so the digits on top stay readable. Angles are registered properties so the
    depletion still animates smoothly. The glow sits on the parent because a
    filter on the masked element itself would be masked away. */
 @property --ring-start {
@@ -207,15 +225,28 @@ main {
   inset: 0;
   background: conic-gradient(
     from var(--ring-start),
-    var(--accent) 0deg,
-    oklch(from var(--accent) l c calc(h + 45) / 0.3) calc(var(--ring-end) - var(--ring-start))
+    oklch(from var(--accent) l c h / 0.85) 0deg,
+    oklch(from var(--accent) l c calc(h + 45) / 0.25) calc(var(--ring-end) - var(--ring-start))
   );
-  /* ring band matches the track: r=52, stroke 3 in a 120 viewBox at 190px */
+  /* disc out to the track's outer edge at any size: r=52 + 1.5 in a 120 viewBox */
   mask-image:
-    radial-gradient(circle, transparent 79.5px, #000 80px, #000 84.7px, transparent 85.2px),
+    radial-gradient(circle closest-side, #000 89.17%, transparent calc(89.17% + 0.5px)),
     conic-gradient(transparent var(--ring-start), #000 var(--ring-start), #000 var(--ring-end), transparent var(--ring-end));
   mask-composite: intersect;
   transition: --ring-start 0.3s linear, --ring-end 0.6s ease-out;
+}
+
+/* Settings > Gauge style: Stroke draws the same gradient on the ring band
+   only (fully opaque at the moving end, since no digits sit on it). */
+#app[data-gauge="stroke"] #ring-fill {
+  background: conic-gradient(
+    from var(--ring-start),
+    var(--accent) 0deg,
+    oklch(from var(--accent) l c calc(h + 45) / 0.3) calc(var(--ring-end) - var(--ring-start))
+  );
+  mask-image:
+    radial-gradient(circle closest-side, transparent calc(84.17% - 0.5px), #000 84.17%, #000 89.17%, transparent calc(89.17% + 0.5px)),
+    conic-gradient(transparent var(--ring-start), #000 var(--ring-start), #000 var(--ring-end), transparent var(--ring-end));
 }
 
 /* Three timer states, set as data-state on #app. Color means "the timer is
@@ -223,14 +254,6 @@ main {
    back - running stays calm so it never pulls focus from the work. */
 #app[data-state="idle"] #ring-glow { opacity: 0; }
 #app[data-state="idle"] #timer-display { opacity: 0.7; }
-#app[data-state="idle"] #start-pause-btn {
-  background: var(--glass-bg-strong);
-  border-color: var(--glass-border);
-}
-#app[data-state="idle"] #start-pause-btn:hover {
-  background: rgba(255, 255, 255, 0.24);
-  filter: none;
-}
 
 #app[data-state="paused"] #ring-glow { opacity: 0.4; filter: none; }
 #app[data-state="paused"] #timer-display {
@@ -247,26 +270,28 @@ main {
 /* Running totals under the controls: completed work sessions and summed
    work time, plus their own reset (separate from the timer's reset icon). */
 #stats {
-  width: 190px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 4px;
+  /* never narrower than its longest row, even when the ring gets small */
+  width: max(var(--ring), 176px);
   font-size: 12px;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-}
+/* Label on the ring's left edge, value on its right edge. */
+.stat-row { display: contents; }
 .stat-row span:first-child { color: rgba(255, 255, 255, 0.65); }
 .stat-row span:last-child {
+  text-align: right;
   color: var(--text);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 #stats-reset-btn {
-  align-self: center;
-  margin-top: 4px;
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin-top: 14px;
   padding: 3px 12px;
   font-size: 11px;
   -webkit-app-region: no-drag;
@@ -274,7 +299,7 @@ main {
 
 #timer-display {
   position: relative;
-  font-size: 32px;
+  font-size: calc(var(--ring) * 0.168);
   font-weight: 600;
   letter-spacing: 2px;
   font-variant-numeric: tabular-nums;
@@ -320,14 +345,6 @@ button:active { transform: scale(0.96); }
 #start-pause-btn.running #play-icon { display: none; }
 #start-pause-btn.running #pause-icon { display: inline; }
 
-button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-  font-weight: 600;
-  box-shadow: var(--glass-shadow-sm);
-}
-button.primary:hover { filter: brightness(1.12); }
 
 /* Denser text needs more contrast than the rest of the widget can spare, so
    the panel is deliberately less see-through: a darker tint under the same
@@ -345,6 +362,9 @@ button.primary:hover { filter: brightness(1.12); }
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
+  /* capped so the timer above keeps most of its size; the panel scrolls */
+  flex: 0 1 auto;
+  max-height: 48%;
   -webkit-app-region: no-drag;
 }
 #settings-panel.hidden { display: none; }
@@ -426,3 +446,196 @@ select {
   font-size: 12px;
   max-width: 150px;
 }
+
+.hidden { display: none !important; }
+
+/* What the current focus session is about; saved with the session. */
+#task-input {
+  flex-shrink: 0;
+  width: max(var(--ring), 176px);
+  height: 26px;
+  padding: 2px 4px;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  -webkit-app-region: no-drag;
+}
+#task-input::placeholder { color: rgba(255, 255, 255, 0.5); }
+#task-input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+input[type="text"],
+input[type="password"] {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  min-width: 0;
+}
+#settings-panel .row input[type="text"],
+#settings-panel .row input[type="password"] { width: 150px; }
+
+.hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.hint.error { color: #ff8a8a; }
+.section-title {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* Tabs stay visible while the panel scrolls. */
+#panel-tabs {
+  position: sticky;
+  top: -12px;
+  z-index: 1;
+  display: flex;
+  gap: 6px;
+  margin: -12px -14px 4px;
+  padding: 10px 14px 8px;
+  background: rgba(14, 14, 20, 0.9);
+}
+#panel-tabs button {
+  flex: 1;
+  padding: 4px 0;
+  font-size: 12px;
+}
+#panel-tabs button[aria-selected="true"] {
+  background: rgba(255, 255, 255, 0.28);
+  font-weight: 600;
+}
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Goals */
+#goal-form {
+  display: flex;
+  gap: 6px;
+}
+#goal-input { flex: 1; }
+#goal-add-btn { padding: 4px 12px; font-size: 12px; }
+#goal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#goal-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.goal-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#goal-list li.done .goal-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.goal-date {
+  color: var(--text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.goal-delete {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+}
+.goal-delete:hover { opacity: 1; }
+
+/* Calendar */
+#cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#cal-header button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+#cal-title { font-weight: 600; }
+#cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.cal-weekday {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.cal-day {
+  position: relative;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 11px;
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+/* Focus time that day, as rising key-color intensity. */
+.cal-day.level-1 { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.cal-day.level-2 { background: color-mix(in srgb, var(--accent) 42%, transparent); }
+.cal-day.level-3 { background: color-mix(in srgb, var(--accent) 65%, transparent); }
+.cal-day.level-4 { background: color-mix(in srgb, var(--accent) 88%, transparent); }
+.cal-day.today { border-color: rgba(255, 255, 255, 0.8); }
+.cal-day.selected { outline: 2px solid #fff; outline-offset: -2px; }
+.cal-day.goal::after {
+  content: '✓';
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 8px;
+  color: #40e0d0;
+}
+#cal-day-title { font-weight: 600; }
+#cal-day-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#cal-day-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.session-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.session-note { width: 100%; }
+.goal-reached { color: #40e0d0; }
