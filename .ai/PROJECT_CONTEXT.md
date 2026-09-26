@@ -462,6 +462,25 @@ commands → the compile and build ladder and every report; `generated` →
   top-right cluster, which is now close · pin · fullscreen. It sits
   15px/15px from the corner, above the tab body's 32px bottom padding.
   Version 1.0.3.
+- Window size and fullscreen, per the user:
+  - The launch size equals the expanded-panel size, 300x780 (the
+    largest). The panel opens inside the window, and `window:resize`, the
+    COLLAPSED/EXPANDED sizes and pinnedSize were all removed. It is
+    clamped to the primary work area height. Old installs are migrated
+    once via `fullHeightLayout`, and later manual sizes are kept.
+  - Fullscreen state is tracked in main (`fullscreenBounds`) instead of
+    via isFullScreen(). Exit restores the exact pre-fullscreen bounds,
+    pinned or not: once immediately, again on 'leave-full-screen', and
+    again after 400ms. A re-entrancy guard is needed because setBounds
+    while leaving fullscreen re-emits 'leave-full-screen' synchronously
+    (a stack overflow reproduced under Xvfb).
+  - Esc exits, via before-input-event.
+  - The window is locked while fullscreen: `#app.fullscreen` sets
+    no-drag, plus a `will-move` preventDefault. The user first asked for
+    drag-to-exit, then changed it to locked.
+  - The renderer is told of changes via `window:fullscreen` (button title,
+    class).
+  - Version 1.0.4.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

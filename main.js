@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS = {
   gaugeStyle: 'pie',
   currentTask: '',
   windowWidth: 300,
-  windowHeight: 460,
+  windowHeight: 780,
   totalTurns: 0,
   totalStudySeconds: 0,
 };
@@ -67,12 +67,27 @@ function saveSettings(partial) {
 let mainWindow = null;
 let tray = null;
 
+// Launch size = the expanded-panel size (the largest the layout needs);
+// the panel opens inside the window instead of resizing it. Installs from
+// before this saved the old 460px launch height, so move them once.
+function initialWindowSize(settings) {
+  if (!settings.fullHeightLayout) {
+    settings.windowWidth = DEFAULT_SETTINGS.windowWidth;
+    settings.windowHeight = DEFAULT_SETTINGS.windowHeight;
+    saveSettings({ windowWidth: settings.windowWidth, windowHeight: settings.windowHeight, fullHeightLayout: true });
+  }
+  // never taller than the screen can show (e.g. 1366x768 laptops)
+  const { height: maxHeight } = screen.getPrimaryDisplay().workAreaSize;
+  return { width: settings.windowWidth, height: Math.min(settings.windowHeight, maxHeight) };
+}
+
 function createWindow() {
   const settings = loadSettings();
+  const size = initialWindowSize(settings);
 
   mainWindow = new BrowserWindow({
-    width: settings.windowWidth,
-    height: settings.windowHeight,
+    width: size.width,
+    height: size.height,
     minWidth: 180,
     minHeight: 140,
     alwaysOnTop: settings.alwaysOnTop,
@@ -96,7 +111,7 @@ function createWindow() {
   mainWindow.on('close', (event) => {
     // persist the windowed size so next launch remembers it - never the
     // fullscreen size, which would reopen as a screen-sized window
-    if (!mainWindow.isFullScreen()) {
+    if (!isFullscreen()) {
       const [w, h] = mainWindow.getSize();
       saveSettings({ windowWidth: w, windowHeight: h });
     }
@@ -118,7 +133,23 @@ function createWindow() {
     }
   });
 
-  mainWindow.on('leave-full-screen', restoreAfterFullscreen);
+  mainWindow.on('leave-full-screen', onLeaveFullscreen);
+
+  // Esc leaves fullscreen.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape' && isFullscreen()) {
+      event.preventDefault();
+      exitFullscreen();
+    }
+  });
+
+  // The window is locked in place while fullscreen. The renderer already
+  // turns off the drag region then; this backstop cancels any other
+  // user-initiated move ('will-move' fires on Windows and macOS only).
+  mainWindow.on('will-move', (event) => {
+    if (isFullscreen()) event.preventDefault();
+  });
+
   trackPointer();
 }
 
@@ -193,12 +224,7 @@ ipcMain.handle('window:setAlwaysOnTop', (_evt, flag) => {
 
 ipcMain.handle('window:setSizeLocked', (_evt, flag) => {
   mainWindow.setResizable(!flag);
-  const sizeLocked = saveSettings({ sizeLocked: !!flag }).sizeLocked;
-  // Pinning while fullscreen must record the windowed size, not the screen.
-  const { width, height } = mainWindow.isFullScreen()
-    ? (preFullscreenBounds || mainWindow.getNormalBounds())
-    : mainWindow.getBounds();
-  return { sizeLocked, width, height };
+  return { sizeLocked: saveSettings({ sizeLocked: !!flag }).sizeLocked };
 });
 
 ipcMain.handle('window:setMinimizeToTray', (_evt, flag) => {
@@ -221,7 +247,7 @@ ipcMain.handle('window:getDisplays', () => {
 
 // corner: 'tl' | 'tr' | 'bl' | 'br'
 ipcMain.handle('window:snapToCorner', (_evt, { displayId, corner }) => {
-  if (mainWindow.isFullScreen()) return null;
+  if (isFullscreen()) return null;
   const displays = screen.getAllDisplays();
   const target = displays.find((d) => d.id === displayId) || screen.getPrimaryDisplay();
   const { x: dx, y: dy, width: dw, height: dh } = target.workArea;
@@ -247,38 +273,62 @@ function withResizeUnlocked(fn) {
   if (wasLocked) mainWindow.setResizable(false);
 }
 
-ipcMain.handle('window:resize', (_evt, { width, height }) => {
-  // Opening/closing settings while fullscreen must not shrink the window.
-  if (mainWindow.isFullScreen()) return;
-  withResizeUnlocked(() => mainWindow.setSize(Math.round(width), Math.round(height), true));
-});
+// Fullscreen state is tracked here rather than read back from the OS:
+// the windowed bounds are saved on the way in and put back on the way out,
+// pinned or not. The restore is applied right away, again on
+// 'leave-full-screen', and once more after the exit animation, because the
+// OS may apply its own bounds late - or, for transparent windows on
+// Windows, never fire 'leave-full-screen' at all.
+let fullscreenBounds = null; // windowed bounds while fullscreen, else null
+let restoreTarget = null;
 
-// Fullscreen works whether or not the size is pinned. The windowed bounds
-// are captured on the way in and restored explicitly on the way out (sized
-// to the pinned size, if pinned at that moment) instead of trusting the OS
-// to restore them - without a window manager it doesn't, and a pinned
-// window must come back at its pinned size even if settings were open.
-// Restoring on 'leave-full-screen' because setFullScreen(false) isn't
-// guaranteed to have finished when it returns.
-let preFullscreenBounds = null;
-let fullscreenRestoreSize = null;
-
-function restoreAfterFullscreen() {
-  if (!preFullscreenBounds) return;
-  const target = fullscreenRestoreSize
-    ? { ...preFullscreenBounds, width: fullscreenRestoreSize.width, height: fullscreenRestoreSize.height }
-    : preFullscreenBounds;
-  preFullscreenBounds = null;
-  fullscreenRestoreSize = null;
-  withResizeUnlocked(() => mainWindow.setBounds(target));
+function isFullscreen() {
+  return fullscreenBounds !== null;
 }
 
-ipcMain.handle('window:toggleFullscreen', (_evt, restoreSize) => {
-  const entering = !mainWindow.isFullScreen();
-  if (entering) preFullscreenBounds = mainWindow.getBounds();
-  else fullscreenRestoreSize = restoreSize || null;
-  mainWindow.setFullScreen(entering);
-  return entering;
+// Re-entrancy guard: resizing a window that is still leaving fullscreen can
+// synchronously emit 'leave-full-screen' again, which would call back in
+// here forever (reproduced on Linux as a stack overflow).
+let restoring = false;
+
+function reassertRestore() {
+  if (restoring || !restoreTarget || isFullscreen()) return;
+  restoring = true;
+  try {
+    withResizeUnlocked(() => mainWindow.setBounds(restoreTarget));
+  } finally {
+    restoring = false;
+  }
+}
+
+function exitFullscreen() {
+  restoreTarget = fullscreenBounds;
+  fullscreenBounds = null;
+  mainWindow.setFullScreen(false);
+  mainWindow.webContents.send('window:fullscreen', false);
+  reassertRestore();
+  setTimeout(() => {
+    reassertRestore();
+    restoreTarget = null;
+  }, 400);
+}
+
+// Also covers fullscreen being left by the OS rather than by our button.
+function onLeaveFullscreen() {
+  if (isFullscreen()) exitFullscreen();
+  else reassertRestore();
+}
+
+ipcMain.handle('window:toggleFullscreen', () => {
+  if (isFullscreen()) {
+    exitFullscreen();
+    return false;
+  }
+  restoreTarget = null;
+  fullscreenBounds = mainWindow.getBounds();
+  mainWindow.setFullScreen(true);
+  mainWindow.webContents.send('window:fullscreen', true);
+  return true;
 });
 
 function escapeXml(text) {

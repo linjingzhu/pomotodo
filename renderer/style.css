@@ -87,6 +87,8 @@ html, body {
   overflow: hidden;
   -webkit-app-region: drag;
 }
+/* Locked in place while fullscreen: no drag region at all. */
+#app.fullscreen { -webkit-app-region: no-drag; }
 
 /* Pin/settings/close: tucked in the top-right corner, invisible until the
    widget is hovered so the idle view stays clean. */

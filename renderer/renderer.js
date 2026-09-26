@@ -34,15 +34,12 @@
   };
 
 
-  const COLLAPSED_SIZE = { width: 300, height: 460 };
-  const EXPANDED_SIZE = { width: 300, height: 780 };
 
   let mode = 'work'; // 'work' | 'break'
   let remainingSec = 25 * 60;
   let timerId = null;
   let running = false;
   let userAccentColor = '#f2405a';
-  let pinnedSize = null; // set while the window size is locked; restored when settings close
   const BREAK_ACCENT_COLOR = '#40e0d0'; // turquoise
   let totalTurns = 0; // completed work sessions, persisted
   let totalStudySeconds = 0; // every second the timer actually ran in work mode, persisted
@@ -281,16 +278,15 @@
     const locked = el.pinBtn.getAttribute('aria-pressed') !== 'true';
     const result = await window.pomodoro.setSizeLocked(locked);
     setPinButtonState(result.sizeLocked);
-    // Remember the size at the moment of pinning, so closing settings later
-    // (which always expands first) restores this instead of the default.
-    pinnedSize = result.sizeLocked ? { width: result.width, height: result.height } : null;
   });
 
-  // Works whether or not pinned; leaving fullscreen while pinned returns to
-  // the pinned size (main applies it once fullscreen has actually ended).
-  el.fullscreenBtn.addEventListener('click', async () => {
-    const isFullscreen = await window.pomodoro.toggleFullscreen(pinnedSize);
-    el.fullscreenBtn.title = isFullscreen ? 'Windowed' : 'Fullscreen';
+  // Works whether or not pinned; leaving fullscreen restores the exact size
+  // and position the window had before.
+  el.fullscreenBtn.addEventListener('click', () => window.pomodoro.toggleFullscreen());
+  // Also fires when Esc or a drag leaves fullscreen.
+  window.pomodoro.onFullscreenChange((on) => {
+    el.fullscreenBtn.title = on ? 'Windowed (Esc)' : 'Fullscreen';
+    el.app.classList.toggle('fullscreen', on);
   });
 
   el.bgPickBtn.addEventListener('click', async () => {
@@ -338,11 +334,9 @@
   let panelOpen = false;
   el.gearBtn.addEventListener('click', async () => {
     panelOpen = !panelOpen;
+    // The window already has room for the panel, so it opens in place
+    // without resizing the window.
     el.settingsPanel.classList.toggle('hidden', !panelOpen);
-    // Opening always expands to fit the panel; closing returns to whatever
-    // size was pinned, if any, rather than always the generic default.
-    const size = panelOpen ? EXPANDED_SIZE : (pinnedSize || COLLAPSED_SIZE);
-    await window.pomodoro.resizeWindow(size.width, size.height);
     window.dispatchEvent(new CustomEvent('panel-toggled', { detail: panelOpen }));
   });
 
