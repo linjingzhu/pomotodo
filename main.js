@@ -164,8 +164,22 @@ function createWindow() {
     if (isFullscreen()) event.preventDefault();
   });
 
+  // Double-clicking the widget flips fullscreen <-> windowed. Over the drag
+  // region Windows gives the page no mouse events at all, only a
+  // non-client double-click on the "caption" (what a drag region is), so
+  // catch that here; the renderer handles double-clicks everywhere else.
+  // Deferred so the switch doesn't run inside the window procedure.
+  if (process.platform === 'win32') {
+    mainWindow.hookWindowMessage(WM_NCLBUTTONDBLCLK, (wParam) => {
+      if (wParam.readUInt32LE(0) === HTCAPTION) setImmediate(toggleFullscreen);
+    });
+  }
+
   trackPointer();
 }
+
+const WM_NCLBUTTONDBLCLK = 0x00a3;
+const HTCAPTION = 2;
 
 // Windows delivers no mouse events over -webkit-app-region: drag, which is
 // most of the widget, so CSS :hover only fired over the no-drag ring and
@@ -369,7 +383,7 @@ function onLeaveFullscreen() {
   else reassertRestore();
 }
 
-ipcMain.handle('window:toggleFullscreen', () => {
+function toggleFullscreen() {
   if (isFullscreen()) {
     exitFullscreen();
     return false;
@@ -379,7 +393,9 @@ ipcMain.handle('window:toggleFullscreen', () => {
   withResizeUnlocked(() => mainWindow.setFullScreen(true));
   mainWindow.webContents.send('window:fullscreen', true);
   return true;
-});
+}
+
+ipcMain.handle('window:toggleFullscreen', () => toggleFullscreen());
 
 function escapeXml(text) {
   return String(text).replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c]);

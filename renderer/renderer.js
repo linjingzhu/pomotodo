@@ -332,6 +332,13 @@
   // Works whether or not pinned; leaving fullscreen restores the exact size
   // and position the window had before.
   el.fullscreenBtn.addEventListener('click', () => window.pomodoro.toggleFullscreen());
+  // Double-clicking the widget flips fullscreen <-> windowed, except on its
+  // controls (and the panel), where a double-click means something else.
+  // Over the drag region this never fires on Windows; main catches those.
+  document.addEventListener('dblclick', (e) => {
+    if (e.target.closest('button, input, select, textarea, label, [role="button"], #settings-panel, #resize-handles')) return;
+    window.pomodoro.toggleFullscreen();
+  });
   // Also fires when Esc leaves fullscreen.
   window.pomodoro.onFullscreenChange((on) => {
     el.fullscreenBtn.title = on ? 'Windowed (Esc)' : 'Fullscreen';

@@ -518,6 +518,19 @@ commands → the compile and build ladder and every report; `generated` →
     marked reached. Goal edits anywhere dispatch `goals-changed`.
   - Reset Session also resets the timer fully: stop, record an
     in-progress focus session like ↻ does, back to work mode, idle.
+  - A double-click on the widget flips fullscreen <-> windowed. Over the
+    drag region Windows gives the page no mouse events, so main hooks
+    `WM_NCLBUTTONDBLCLK` (HTCAPTION only) and defers `toggleFullscreen`;
+    elsewhere (fullscreen is all no-drag) a page `dblclick` does it,
+    skipping buttons, inputs, labels, the panel and the resize handles.
+    Not verifiable here: Xvfb has no WM, so a "fullscreen" X window keeps
+    its old geometry, and under Wine xdotool input never reached the app
+    window. The page path was checked with sendInputEvent.
+  - Focused text, number and select fields drop the browser focus ring
+    (orange on Windows, drawn outside the box and clipped by the
+    scrolling panel) for a brighter border. Select options get a dark
+    background and light text: the native popup's white background hid
+    the inherited white text of unselected items.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

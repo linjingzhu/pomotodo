@@ -488,6 +488,14 @@ select {
   padding: 4px 8px;
   font-size: 12px;
   max-width: 150px;
+  color-scheme: dark;
+}
+/* The open list is a native popup with an opaque background: white text
+   inherited from the select vanished on its default white, so give the
+   options their own dark background and light text. */
+select option {
+  background-color: #2a2a30;
+  color: #f2f2f2;
 }
 
 .hidden { display: none !important; }
@@ -568,6 +576,16 @@ input[type="text"] {
   font: inherit;
   font-size: 12px;
   min-width: 0;
+}
+
+/* Active fields: no browser focus ring (orange on Windows, and drawn
+   outside the box, where the panel's scrolling edge cut it off); the
+   field's own border brightens instead, inside its bounds. */
+input[type="text"]:focus,
+input[type="number"]:focus,
+select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
 .hint {
