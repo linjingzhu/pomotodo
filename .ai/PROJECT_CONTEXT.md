@@ -456,6 +456,12 @@ commands → the compile and build ladder and every report; `generated` →
   - OA-15 is marked not applicable.
   - Existing users' google-calendar.json in userData is left alone
     (harmless).
+- The panel (gear) dot moved to the bottom-right corner, per the user, in
+  `.corner-actions.bottom`. It's placed after the panel in the DOM so it
+  stays clickable over the open panel, and is revealed on hover like the
+  top-right cluster, which is now close · pin · fullscreen. It sits
+  15px/15px from the corner, above the tab body's 32px bottom padding.
+  Version 1.0.3.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
