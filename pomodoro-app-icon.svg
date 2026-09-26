@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Pomodoro timer app icon</title>
+  <desc id="desc">A dark rounded-square app icon with an orange-to-red circular timer ring and a white pause symbol.</desc>
+
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#171D27"/>
+      <stop offset="0.55" stop-color="#252D3B"/>
+      <stop offset="1" stop-color="#10151E"/>
+    </linearGradient>
+    <linearGradient id="tileSheen" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.17"/>
+      <stop offset="0.42" stop-color="#FFFFFF" stop-opacity="0.02"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.18"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0.08" y1="0.12" x2="0.86" y2="0.9">
+      <stop offset="0" stop-color="#FFB05E"/>
+      <stop offset="0.42" stop-color="#F46A3B"/>
+      <stop offset="1" stop-color="#E82E39"/>
+    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="38%" r="72%">
+      <stop offset="0" stop-color="#3A414E" stop-opacity="0.78"/>
+      <stop offset="1" stop-color="#171D27" stop-opacity="0.86"/>
+    </radialGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#000000" flood-opacity="0.38"/>
+    </filter>
+    <filter id="ringGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="tileClip">
+      <rect x="32" y="32" width="960" height="960" rx="214"/>
+    </clipPath>
+  </defs>
+
+  <!-- Deep launcher tile -->
+  <rect x="32" y="32" width="960" height="960" rx="214" fill="#0B0F16" filter="url(#shadow)"/>
+  <rect x="32" y="32" width="960" height="960" rx="214" fill="url(#tile)"/>
+  <rect x="32" y="32" width="960" height="960" rx="214" fill="url(#tileSheen)"/>
+
+  <!-- Quiet inner depth, keeping the icon legible at small sizes -->
+  <circle cx="512" cy="512" r="334" fill="url(#core)" opacity="0.92"/>
+  <circle cx="512" cy="512" r="334" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="4"/>
+
+  <!-- Soft ring aura -->
+  <circle cx="512" cy="512" r="238" fill="none" stroke="#F05B3D" stroke-opacity="0.16" stroke-width="78" filter="url(#ringGlow)"/>
+
+  <!-- Timer track -->
+  <circle cx="512" cy="512" r="238" fill="none" stroke="#AAB3BE" stroke-opacity="0.24" stroke-width="54"/>
+
+  <!-- Progress ring, intentionally incomplete like a running timer -->
+  <circle cx="512" cy="512" r="238" fill="none" stroke="url(#ring)" stroke-width="54" stroke-linecap="round"
+          stroke-dasharray="1112 383" transform="rotate(-90 512 512)"/>
+
+  <!-- Small endpoint highlight -->
+  <circle cx="512" cy="274" r="24" fill="#FFD09A"/>
+
+  <!-- Central remaining-minute label -->
+  <text x="512" y="565" text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif" font-size="150" font-weight="700"
+        letter-spacing="-5" fill="#FFF8F1">25</text>
+
+  <!-- Subtle top highlight clipped to the tile -->
+  <g clip-path="url(#tileClip)" opacity="0.16">
+    <ellipse cx="360" cy="96" rx="430" ry="150" fill="#FFFFFF"/>
+  </g>
+</svg>
