@@ -4,6 +4,7 @@
     startPauseBtn: document.getElementById('start-pause-btn'),
     resetBtn: document.getElementById('reset-btn'),
     pinBtn: document.getElementById('pin-btn'),
+    fullscreenBtn: document.getElementById('fullscreen-btn'),
     gearBtn: document.getElementById('gear-btn'),
     closeBtn: document.getElementById('close-btn'),
     settingsPanel: document.getElementById('settings-panel'),
@@ -195,6 +196,13 @@
     // Remember the size at the moment of pinning, so closing settings later
     // (which always expands first) restores this instead of the default.
     pinnedSize = result.sizeLocked ? { width: result.width, height: result.height } : null;
+  });
+
+  // Works whether or not pinned; leaving fullscreen while pinned returns to
+  // the pinned size (main applies it once fullscreen has actually ended).
+  el.fullscreenBtn.addEventListener('click', async () => {
+    const isFullscreen = await window.pomodoro.toggleFullscreen(pinnedSize);
+    el.fullscreenBtn.title = isFullscreen ? '창 모드' : '전체화면';
   });
 
   el.bgPickBtn.addEventListener('click', async () => {

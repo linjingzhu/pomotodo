@@ -250,6 +250,14 @@ commands → the compile and build ladder and every report; `generated` →
   `rgba(0,0,0,9)` (only the box-shadow edge).
   Lesson: reproduce with the user's real settings before blaming the
   platform.
+- Added a 4th hover dot (last): fullscreen/window toggle. Removed
+  `fullscreenable: false`. Works while pinned. main.js captures the windowed
+  bounds on entry and restores them itself on 'leave-full-screen' (with
+  the pinned size if pinned). Without that, Xvfb (no window manager) left
+  the window screen-sized after exit, and it no longer depended on the OS.
+  Resize, snap and saving size on close are all ignored while fullscreen.
+  Verified under Xvfb, both pinned and unpinned: fullscreen, then settings
+  open/close, then exit returns 420x340. Real Windows is OA-9.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

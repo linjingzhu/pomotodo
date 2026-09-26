@@ -73,7 +73,6 @@ function createWindow() {
     alwaysOnTop: settings.alwaysOnTop,
     resizable: !settings.sizeLocked,
     frame: false,
-    fullscreenable: false,
     transparent: true,
     // Windows can default a transparent window's backing surface to opaque
     // black unless this is spelled out explicitly (fully-transparent ARGB).
@@ -90,9 +89,12 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   mainWindow.on('close', (event) => {
-    // persist current window size so next launch remembers it
-    const [w, h] = mainWindow.getSize();
-    saveSettings({ windowWidth: w, windowHeight: h });
+    // persist the windowed size so next launch remembers it - never the
+    // fullscreen size, which would reopen as a screen-sized window
+    if (!mainWindow.isFullScreen()) {
+      const [w, h] = mainWindow.getSize();
+      saveSettings({ windowWidth: w, windowHeight: h });
+    }
     // A real quit (from the tray menu, or window-all-closed on non-mac) must
     // go through; only an interactive close (the in-app close button) can be
     // redirected.
@@ -110,6 +112,8 @@ function createWindow() {
       mainWindow.hide();
     }
   });
+
+  mainWindow.on('leave-full-screen', restoreAfterFullscreen);
 }
 
 function showWindow() {
@@ -162,7 +166,10 @@ ipcMain.handle('window:setAlwaysOnTop', (_evt, flag) => {
 ipcMain.handle('window:setSizeLocked', (_evt, flag) => {
   mainWindow.setResizable(!flag);
   const sizeLocked = saveSettings({ sizeLocked: !!flag }).sizeLocked;
-  const [width, height] = mainWindow.getSize();
+  // Pinning while fullscreen must record the windowed size, not the screen.
+  const { width, height } = mainWindow.isFullScreen()
+    ? (preFullscreenBounds || mainWindow.getNormalBounds())
+    : mainWindow.getBounds();
   return { sizeLocked, width, height };
 });
 
@@ -186,6 +193,7 @@ ipcMain.handle('window:getDisplays', () => {
 
 // corner: 'tl' | 'tr' | 'bl' | 'br'
 ipcMain.handle('window:snapToCorner', (_evt, { displayId, corner }) => {
+  if (mainWindow.isFullScreen()) return null;
   const displays = screen.getAllDisplays();
   const target = displays.find((d) => d.id === displayId) || screen.getPrimaryDisplay();
   const { x: dx, y: dy, width: dw, height: dh } = target.workArea;
@@ -200,15 +208,49 @@ ipcMain.handle('window:snapToCorner', (_evt, { displayId, corner }) => {
   return { x, y };
 });
 
-ipcMain.handle('window:resize', (_evt, { width, height }) => {
-  // setSize() is unreliable on at least some platforms while resizable is
-  // false (reproduced even with no app code involved) - briefly unlock
-  // around our own programmatic resize, then restore the lock. The window
-  // is never draggable-by-the-user in between: this all runs synchronously.
+// setSize()/setBounds() are unreliable on at least some platforms while
+// resizable is false (reproduced even with no app code involved) - briefly
+// unlock around our own programmatic resize, then restore the lock. The
+// window is never draggable-by-the-user in between: this runs synchronously.
+function withResizeUnlocked(fn) {
   const wasLocked = !mainWindow.isResizable();
   if (wasLocked) mainWindow.setResizable(true);
-  mainWindow.setSize(Math.round(width), Math.round(height), true);
+  fn();
   if (wasLocked) mainWindow.setResizable(false);
+}
+
+ipcMain.handle('window:resize', (_evt, { width, height }) => {
+  // Opening/closing settings while fullscreen must not shrink the window.
+  if (mainWindow.isFullScreen()) return;
+  withResizeUnlocked(() => mainWindow.setSize(Math.round(width), Math.round(height), true));
+});
+
+// Fullscreen works whether or not the size is pinned. The windowed bounds
+// are captured on the way in and restored explicitly on the way out (sized
+// to the pinned size, if pinned at that moment) instead of trusting the OS
+// to restore them - without a window manager it doesn't, and a pinned
+// window must come back at its pinned size even if settings were open.
+// Restoring on 'leave-full-screen' because setFullScreen(false) isn't
+// guaranteed to have finished when it returns.
+let preFullscreenBounds = null;
+let fullscreenRestoreSize = null;
+
+function restoreAfterFullscreen() {
+  if (!preFullscreenBounds) return;
+  const target = fullscreenRestoreSize
+    ? { ...preFullscreenBounds, width: fullscreenRestoreSize.width, height: fullscreenRestoreSize.height }
+    : preFullscreenBounds;
+  preFullscreenBounds = null;
+  fullscreenRestoreSize = null;
+  withResizeUnlocked(() => mainWindow.setBounds(target));
+}
+
+ipcMain.handle('window:toggleFullscreen', (_evt, restoreSize) => {
+  const entering = !mainWindow.isFullScreen();
+  if (entering) preFullscreenBounds = mainWindow.getBounds();
+  else fullscreenRestoreSize = restoreSize || null;
+  mainWindow.setFullScreen(entering);
+  return entering;
 });
 
 ipcMain.handle('notify', (_evt, { title, body }) => {
