@@ -1,6 +1,5 @@
 (() => {
   const el = {
-    modeLabel: document.getElementById('mode-label'),
     timerDisplay: document.getElementById('timer-display'),
     startPauseBtn: document.getElementById('start-pause-btn'),
     resetBtn: document.getElementById('reset-btn'),
@@ -50,7 +49,6 @@
 
   function render() {
     el.timerDisplay.textContent = fmt(remainingSec);
-    el.modeLabel.textContent = mode === 'work' ? 'Pomodoro Timer' : '휴식';
     el.startPauseBtn.classList.toggle('running', running);
     el.startPauseBtn.title = running ? '일시정지' : '시작';
     const remainingFraction = remainingSec / currentDurationSec();

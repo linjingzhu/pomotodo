@@ -93,7 +93,12 @@ commands → the compile and build ladder and every report; `generated` →
   rounded div be the whole shape, window edges included — the area outside
   it is genuinely transparent to the desktop. The pin/gear/close cluster is
   `position: absolute`, `opacity: 0` by default, revealed only on
-  `#app:hover`, so the idle widget stays clean.
+  `#app:hover`, so the idle widget stays clean. The three buttons are plain
+  dots (an inline SVG circle each, no icon glyph) identified only by their
+  native `title=` tooltip; pin is the one dot with real state, so it alone
+  overrides the shared style to go hollow (unlocked) or solid white
+  (locked). No text mode-label — the ring's own color (key color for work,
+  fixed turquoise for break) is the only mode indicator now.
 - `package.json` — `electron-builder` config targets `nsis` (installer) and
   `portable` for `win`/`x64`.
 - Build/run this repo can verify directly: `npm install`, syntax/lint of the
@@ -195,6 +200,17 @@ commands → the compile and build ladder and every report; `generated` →
   NOT VERIFIED: because the window is genuinely OS-transparent, its real
   appearance depends on whatever is behind it on the user's actual desktop
   — only tested against Xvfb's plain background here. Flagged to the user.
+- Removed the "Pomodoro Timer"/"휴식" text mode-label entirely (element,
+  CSS, and the render() line that set it) - the reference image had no
+  label. Fixed a real bug the same conversation surfaced: the pin/gear/
+  close buttons weren't perfect circles because they inherited the generic
+  `button` rule's `padding: 7px 14px`, which (under `box-sizing:
+  border-box`) left less width than the 22px box could hold, stretching
+  them oval; added `padding: 0` to fix. Then restyled all three from
+  icon/emoji buttons (📌/⚙/✕) to plain uniform dots (matching pin's
+  existing inline-SVG-circle approach, extended to gear/close) identified
+  only by their `title=` tooltip, per a follow-up request in the same
+  batch.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

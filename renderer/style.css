@@ -102,33 +102,50 @@ html, body {
   opacity: 1;
 }
 
+/* Three small uniform dots; the 22px button box is just the hit target and
+   hover highlight, invisible until hovered. Tooltips (title=) carry the
+   function name since the dots themselves no longer show an icon. */
 #pin-btn,
 #gear-btn,
 #close-btn {
-  background: rgba(255, 255, 255, 0.14);
+  background: none;
   border: none;
-  color: var(--text-muted);
-  font-size: 13px;
   cursor: pointer;
   width: 22px;
   height: 22px;
+  padding: 0;
+  flex-shrink: 0;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 #pin-btn:hover { background: var(--glass-bg-strong); }
-#gear-btn:hover { background: var(--glass-bg-strong); color: var(--text); }
-#close-btn:hover { background: var(--accent); color: white; }
+#gear-btn:hover { background: var(--glass-bg-strong); }
+#close-btn:hover { background: var(--accent); }
 #pin-btn:active, #gear-btn:active, #close-btn:active { transform: scale(0.88); }
 
-/* Pin toggle: a hollow (stroke-only) circle when off, a solid (filled)
-   circle when the window size is locked. */
+#pin-btn svg circle,
+#gear-btn svg circle,
+#close-btn svg circle {
+  fill: white;
+  opacity: 0.6;
+}
+#pin-btn:hover svg circle,
+#gear-btn:hover svg circle,
+#close-btn:hover svg circle {
+  opacity: 1;
+}
+
+/* Pin toggle overrides the shared dot style: hollow (stroke-only) when
+   off, solid (filled) when the window size is locked - the one dot with
+   real on/off state to show. */
 #pin-btn svg circle {
   fill: none;
   stroke: white;
   stroke-width: 2;
+  opacity: 1;
   transition: fill 0.15s ease, stroke 0.15s ease;
 }
 #pin-btn[aria-pressed="true"] svg circle {
@@ -144,14 +161,6 @@ main {
   justify-content: center;
   gap: 18px;
   padding: 24px;
-}
-
-#mode-label {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--accent);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
 }
 
 #timer-ring {
