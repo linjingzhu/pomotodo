@@ -136,7 +136,8 @@
       const cell = make('button', { className: `cal-day level-${level(sec)}`, textContent: String(d) });
       if (key === dayKey(today)) cell.classList.add('today');
       if (key === selectedDay) cell.classList.add('selected');
-      cell.title = sec ? `${duration(sec)} of focus` : 'No focus sessions';
+      const date = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      cell.title = sec ? `${date} · ${duration(sec)} of focus` : `${date} · No focus sessions`;
       cell.addEventListener('click', () => {
         selectedDay = key;
         renderMonth();
