@@ -160,8 +160,8 @@ function toggleWindow() {
 
 function createTray() {
   const icon = nativeImage
-    .createFromPath(path.join(__dirname, 'renderer', 'icon.png'))
-    .resize({ width: 16, height: 16 });
+    // loads tray-icon@2x.png too, for 200% displays
+    .createFromPath(path.join(__dirname, 'renderer', 'tray-icon.png'));
   tray = new Tray(icon);
   tray.setToolTip('Pomodoro Timer');
   tray.setContextMenu(

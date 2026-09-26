@@ -9,7 +9,8 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "icons": "electron scripts/make-icons.js"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -30,7 +31,7 @@
       "output": "dist"
     },
     "win": {
-      "icon": "renderer/icon.png",
+      "icon": "build/icon.ico",
       "target": [
         { "target": "portable", "arch": ["x64"] }
       ]

@@ -33,7 +33,7 @@ runtime_gate: none
 test_command: npm test
 lint_command: none
 build_command: npm run dist
-generated: none
+generated: build/icon.ico, renderer/icon.png, renderer/tray-icon.png, renderer/tray-icon@2x.png (from assets/pomodoro-app-icon.svg via `npm run icons`; add --no-sandbox when running as root)
 external_scripts: none
 public_ids: none
 owner_ledger: docs/OWNER_ACTIONS.md
@@ -435,6 +435,17 @@ commands → the compile and build ladder and every report; `generated` →
   the rounded corners. Earlier, the sticky bar's 90%-opaque background let
   rows sliding under it show through. (First misread as a sticky-offset
   bug; measuring disproved that.)
+- App icon, per the user: the owner uploaded `pomodoro-app-icon.svg` to
+  stable (the SVG chat attachment was rejected). It was reviewed (no
+  scripts or external refs) and moved to `assets/`.
+  - `scripts/make-icons.js` (`npm run icons`) rasterizes the SVG separately
+    at each size in offscreen Chromium, with alpha. It writes a 7-size
+    PNG-entry `build/icon.ico` (the exe icon), the 256px window icon, and
+    tray 16px plus @2x 32px.
+  - `win.icon` now points to build/icon.ico.
+  - The tray loads tray-icon.png, and nativeImage picks up @2x (scale
+    factors [1,2]). Before, it was a 256px icon resized to 16.
+  - The `wrestool` extract of the built exe shows all 7 sizes.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
