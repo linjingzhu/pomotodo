@@ -427,9 +427,14 @@ commands → the compile and build ladder and every report; `generated` →
   empty space; Calendar and Settings scroll. It measured 371px on all
   three tabs under Xvfb. Also added a thin translucent scrollbar and
   bumped the version to 1.0.2.
-- Panel tabs, per the user: plain text with no pill background; the active
-  tab uses the key color (text plus 2px underline, `var(--accent)`, so it
-  turns turquoise during breaks).
+- Panel tabs, per the user: plain text, no background and no underline. The
+  active tab is only in the key color (`var(--accent)`, turquoise during
+  breaks).
+- The panel no longer scrolls as a whole. The tab bar is fixed and only
+  the `.tab` body scrolls, with 32px bottom padding so the last row clears
+  the rounded corners. Earlier, the sticky bar's 90%-opaque background let
+  rows sliding under it show through. (First misread as a sticky-offset
+  bug; measuring disproved that.)
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
