@@ -32,19 +32,19 @@ html, body {
   padding: 0;
   height: 100%;
   font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
-  background: var(--bg);
+  background: transparent;
   color: var(--text);
   user-select: none;
   overflow: hidden;
 }
 
-/* Background image (short side fills the window, long side crops) plus an
-   independent tint overlay; both sit behind #app, which stays transparent
-   so either shows through the glass surfaces above them. Inset is larger
-   than the max blur radius so the blur filter never reveals a transparent
-   edge. */
+/* Background image (short side fills the widget, long side crops) plus an
+   independent tint overlay; both sit behind #app, clipped to its rounded
+   shape since #app itself hides overflow. The window around #app is
+   transparent (see main.js), so the desktop shows through everywhere the
+   pill shape doesn't cover. */
 #bg-image {
-  position: fixed;
+  position: absolute;
   inset: -40px;
   background-size: cover;
   background-position: center;
@@ -54,7 +54,7 @@ html, body {
 }
 
 #bg-tint {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 0;
   background: transparent;
@@ -62,48 +62,56 @@ html, body {
   pointer-events: none;
 }
 
+/* #app is the entire visible widget: a single continuously-rounded "pill"
+   of glass. Overflow is clipped to it so the settings panel, background
+   image and tint never poke out past its rounded corners. */
 #app {
   position: relative;
   z-index: 1;
+  margin: 3px;
+  height: calc(100vh - 6px);
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background: transparent;
-}
-
-#titlebar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
+  border-radius: 46px;
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border-bottom: 1px solid var(--glass-border);
-  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
   -webkit-app-region: drag;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--accent);
 }
 
+/* Pin/settings/close: tucked in the top-right corner, invisible until the
+   widget is hovered so the idle view stays clean. */
 .titlebar-actions {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.18s ease;
   -webkit-app-region: no-drag;
+}
+#app:hover .titlebar-actions,
+.titlebar-actions:focus-within {
+  opacity: 1;
 }
 
 #pin-btn,
 #gear-btn,
 #close-btn {
-  background: none;
+  background: rgba(255, 255, 255, 0.14);
   border: none;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -134,31 +142,26 @@ main {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px;
-  background: transparent;
+  gap: 18px;
+  padding: 24px;
 }
 
-.glass-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 26px;
-  border-radius: 32px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+#mode-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
 }
 
 #timer-ring {
   position: relative;
-  width: 130px;
-  height: 130px;
+  width: 190px;
+  height: 190px;
   display: flex;
   align-items: center;
   justify-content: center;
+  -webkit-app-region: no-drag;
 }
 
 #timer-ring svg {
@@ -171,26 +174,26 @@ main {
 
 .ring-track {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.14);
-  stroke-width: 8;
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 3;
 }
 
 #ring-progress {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 8;
+  stroke-width: 3;
   stroke-linecap: round;
   stroke-dasharray: 326.7256;
   stroke-dashoffset: 0;
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 70%, transparent));
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 75%, transparent));
   transition: stroke-dashoffset 0.3s linear, stroke 0.3s ease;
 }
 
 #timer-display {
   position: relative;
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: 2px;
   font-variant-numeric: tabular-nums;
   color: var(--text);
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
@@ -199,7 +202,8 @@ main {
 #controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
+  -webkit-app-region: no-drag;
 }
 
 button {
@@ -219,14 +223,16 @@ button {
 button:hover { background: rgba(255, 255, 255, 0.24); }
 button:active { transform: scale(0.96); }
 
-#start-pause-btn {
-  width: 52px;
-  height: 52px;
+#start-pause-btn,
+#reset-btn {
+  width: 58px;
+  height: 58px;
   padding: 0;
   border-radius: 50%;
   flex-shrink: 0;
 }
-#start-pause-btn svg { fill: currentColor; }
+#start-pause-btn svg,
+#reset-btn svg { fill: currentColor; }
 #start-pause-btn #pause-icon { display: none; }
 #start-pause-btn.running #play-icon { display: none; }
 #start-pause-btn.running #pause-icon { display: inline; }
@@ -240,23 +246,23 @@ button.primary {
 }
 button.primary:hover { filter: brightness(1.12); }
 
-/* Denser text needs more contrast than the titlebar/card can spare, so the
-   panel is deliberately less see-through: a darker tint under the same
+/* Denser text needs more contrast than the rest of the widget can spare, so
+   the panel is deliberately less see-through: a darker tint under the same
    blur, plus a text-shadow on labels below, keep rows legible over any
-   background image. */
+   background image. It shares #app's rounded clipping, so it needs no
+   border-radius of its own. */
 #settings-panel {
   padding: 12px 14px 16px;
   background: linear-gradient(160deg, rgba(10, 10, 16, 0.62), rgba(10, 10, 16, 0.5));
   backdrop-filter: blur(var(--glass-blur)) saturate(140%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
   border-top: 1px solid var(--glass-border);
-  border-radius: 24px 24px 0 0;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3);
   font-size: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
+  -webkit-app-region: no-drag;
 }
 #settings-panel.hidden { display: none; }
 

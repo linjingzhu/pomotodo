@@ -17,8 +17,8 @@ const DEFAULT_SETTINGS = {
   backgroundTintColor: '#15161e',
   backgroundTintOpacity: 0,
   accentColor: '#f2405a',
-  windowWidth: 340,
-  windowHeight: 250,
+  windowWidth: 300,
+  windowHeight: 460,
 };
 
 const IMAGE_MIME_TYPES = {
@@ -74,6 +74,8 @@ function createWindow() {
     resizable: !settings.sizeLocked,
     frame: false,
     fullscreenable: false,
+    transparent: true,
+    hasShadow: false, // the CSS box-shadow on the rounded #app shape replaces it
     icon: path.join(__dirname, 'renderer', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

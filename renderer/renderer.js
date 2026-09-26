@@ -31,8 +31,8 @@
   const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
   el.ringProgress.style.strokeDasharray = String(RING_CIRCUMFERENCE);
 
-  const COLLAPSED_SIZE = { width: 340, height: 250 };
-  const EXPANDED_SIZE = { width: 340, height: 690 };
+  const COLLAPSED_SIZE = { width: 300, height: 460 };
+  const EXPANDED_SIZE = { width: 300, height: 780 };
 
   let mode = 'work'; // 'work' | 'break'
   let remainingSec = 25 * 60;

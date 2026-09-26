@@ -54,8 +54,10 @@ commands → the compile and build ladder and every report; `generated` →
 - Single-window Pomodoro timer: work/break countdown, always-on-top toggle,
   corner-snap to a chosen monitor, native OS notification plus a single
   synthesized chime on phase change, system tray icon with minimize-to-tray,
-  settings persisted to disk between launches. Frameless window: no native
-  title bar, an in-app close button instead; no fullscreen.
+  settings persisted to disk between launches. Frameless AND transparent
+  window shaped entirely by CSS as a rounded "pill": no native title bar,
+  no fullscreen; the pin/settings/close buttons live in a top-right cluster
+  hidden until the widget is hovered.
 - No account system, no network calls, no telemetry, no ads. Fully offline.
 - Korean-language UI (target user is a Korean speaker); code, comments and
   commit messages stay in English per repository convention.
@@ -78,10 +80,20 @@ commands → the compile and build ladder and every report; `generated` →
   `data:` URL on demand (`background:pick`/`background:get` IPC), so
   `settings.json` stays small. The renderer applies it via
   `background-size: cover` (fills on the short side, crops the long side)
-  behind a separate tint overlay div, both behind a set of translucent
-  `backdrop-filter: blur()` "glass" surfaces (titlebar, timer card,
-  settings panel) — the glassmorphism look the user asked for. The accent
-  color is a single CSS custom property (`--accent`) the user repoints live.
+  behind a separate tint overlay div, both clipped to `#app`'s rounded
+  shape (`overflow: hidden`) and behind a set of translucent, saturated
+  `backdrop-filter: blur() saturate()` "Liquid Glass" surfaces — `#app`
+  itself (the whole widget body) and the settings panel (deliberately
+  darker/less saturated than `#app`, for text contrast). The accent color
+  is a single CSS custom property (`--accent`) the user repoints live;
+  break mode overrides it to a fixed turquoise regardless.
+- `#app` is the entire visible widget, not just an inner card: `frame: false`
+  plus `transparent: true` on the `BrowserWindow` (`hasShadow: false`, since
+  the CSS box-shadow replaces the native one) let a single continuously
+  rounded div be the whole shape, window edges included — the area outside
+  it is genuinely transparent to the desktop. The pin/gear/close cluster is
+  `position: absolute`, `opacity: 0` by default, revealed only on
+  `#app:hover`, so the idle widget stays clean.
 - `package.json` — `electron-builder` config targets `nsis` (installer) and
   `portable` for `win`/`x64`.
 - Build/run this repo can verify directly: `npm install`, syntax/lint of the
@@ -169,6 +181,20 @@ commands → the compile and build ladder and every report; `generated` →
   saturated titlebar/card treatment made its denser text unreadable over a
   busy background image — verified by screenshotting both before and after
   that fix under Xvfb with a vivid gradient standing in for a busy photo.
+- Reshaped the whole window into a rounded "pill" widget per a user-supplied
+  reference image: transparent + frameless `BrowserWindow`, `#app` as the
+  single rounded glass body (46px radius, `overflow: hidden` clipping
+  everything to it), the old horizontal titlebar removed in favor of a
+  vertical pin/gear/close cluster pinned to the top-right corner. That
+  cluster is invisible until the widget is hovered (a later request in the
+  same batch). Ring enlarged (130px → 190px) and thinned (stroke 8 → 3) to
+  match the reference's airy outline look; start/pause and reset are both
+  large circular icon buttons now (reset gained a ↺ icon, replacing its
+  "초기화" text). Default/collapsed size 340×250 → 300×460 (tall, not wide);
+  expanded 340×690 → 300×780.
+  NOT VERIFIED: because the window is genuinely OS-transparent, its real
+  appearance depends on whatever is behind it on the user's actual desktop
+  — only tested against Xvfb's plain background here. Flagged to the user.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
