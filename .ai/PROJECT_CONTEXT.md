@@ -233,6 +233,14 @@ commands → the compile and build ladder and every report; `generated` →
 - Reduced `#app`'s outer corner radius 46px → 32px per a follow-up request
   ("iPhone style" — tighter, more device-like corners, less of a full
   pill).
+- First real Windows build surfaced the risk flagged at OA-8: the
+  transparent window rendered a solid black rectangle around the rounded
+  `#app` shape instead of true desktop transparency (never reproducible in
+  this Linux/Xvfb container — DWM compositing differs). Fixed with
+  `backgroundColor: '#00000000'` on the `BrowserWindow`, since Windows can
+  default a transparent window's backing surface to opaque black unless
+  that's spelled out explicitly. NOT VERIFIED here either, for the same
+  platform reason; waiting on the user's next real-desktop rebuild.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

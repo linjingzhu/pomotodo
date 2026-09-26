@@ -75,6 +75,9 @@ function createWindow() {
     frame: false,
     fullscreenable: false,
     transparent: true,
+    // Windows can default a transparent window's backing surface to opaque
+    // black unless this is spelled out explicitly (fully-transparent ARGB).
+    backgroundColor: '#00000000',
     hasShadow: false, // the CSS box-shadow on the rounded #app shape replaces it
     icon: path.join(__dirname, 'renderer', 'icon.png'),
     webPreferences: {
