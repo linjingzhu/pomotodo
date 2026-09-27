@@ -10,6 +10,7 @@
     timerDisplay: document.getElementById('timer-display'),
     startPauseBtn: document.getElementById('start-pause-btn'),
     resetBtn: document.getElementById('reset-btn'),
+    skipModeBtn: document.getElementById('skip-mode-btn'),
     pinBtn: document.getElementById('pin-btn'),
     fullscreenBtn: document.getElementById('fullscreen-btn'),
     gearBtn: document.getElementById('gear-btn'),
@@ -96,6 +97,7 @@
     // The arc spans [start, 360deg]; start advancing clockwise from 12
     // o'clock is the depleted portion growing clockwise.
     el.ringFill.style.setProperty('--ring-start', `${360 * (1 - remainingFraction)}deg`);
+    el.skipModeBtn.title = mode === 'work' ? 'Switch to Break' : 'Switch to Focus';
     renderStats();
     reportProgress(state, 1 - remainingFraction);
   }
@@ -339,6 +341,26 @@
   el.resetBtn.addEventListener('click', () => {
     window.pomodoro.closeNotification();
     resetTimer();
+  });
+
+  // Switches straight to the other phase, right now - not treated as a
+  // natural completion: a skipped work phase is recorded like an early
+  // stop (no turn credited, no long-break progress), same as Reset. It
+  // always lands on the short break, and always returns to work from
+  // either kind of break, regardless of what was running.
+  el.skipModeBtn.addEventListener('click', () => {
+    window.pomodoro.closeNotification();
+    stopTick();
+    if (mode === 'work') {
+      finishSession(false);
+      mode = 'break';
+    } else {
+      mode = 'work';
+    }
+    applyModeColor();
+    remainingMs = currentDurationSec() * 1000;
+    saveStats();
+    render();
   });
 
   // Reset Session: the timer goes all the way back to a fresh, idle focus

@@ -378,7 +378,8 @@ button:active { transform: scale(0.96); }
 button:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 
 #start-pause-btn,
-#reset-btn {
+#reset-btn,
+#skip-mode-btn {
   width: 58px;
   height: 58px;
   padding: 0;
@@ -386,7 +387,8 @@ button:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
   flex-shrink: 0;
 }
 #start-pause-btn svg,
-#reset-btn svg { fill: currentColor; }
+#reset-btn svg,
+#skip-mode-btn svg { fill: currentColor; }
 #start-pause-btn #pause-icon { display: none; }
 #start-pause-btn.running #play-icon { display: none; }
 #start-pause-btn.running #pause-icon { display: inline; }

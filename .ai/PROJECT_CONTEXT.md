@@ -700,6 +700,17 @@ commands → the compile and build ladder and every report; `generated` →
   reads) and deleted the root-level upload, then re-ran the script.
   Regenerated: build/icon.ico, renderer/icon.png, renderer/tray-icon.png,
   renderer/tray-icon@2x.png. Checked visually at 256px and 32px (tray).
+- A third control button, per the user: manually switches work<->break
+  (#skip-mode-btn, after Reset). Deliberately NOT switchMode() reused
+  wholesale: that function's totalTurns++/finishSession(true) treats the
+  work phase as genuinely completed, which a manual early skip is not,
+  so skipping a work phase instead calls finishSession(false) (records
+  "stopped early" only past 60s, matching Reset's own semantics) with no
+  turn credited and no long-break-cycle progress; it always lands on the
+  short break, and either break always returns to work. No chime/
+  notification (an explicit user action, not an unattended completion).
+  Verified: idle toggle, a <60s skip (nothing recorded), a 61s skip
+  (recorded stopped-early, turns unchanged).
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
