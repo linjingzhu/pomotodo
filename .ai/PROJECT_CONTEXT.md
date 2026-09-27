@@ -808,6 +808,29 @@ commands → the compile and build ladder and every report; `generated` →
   give the modal dialog reliable keyboard focus for Escape), but the
   branch is a direct no-op read of the same response value already
   proven correct for Quit.
+- Fixed (dropdown audit): every custom dropdown (Gauge style, Monitor,
+  Goals time zone) could open detached from its button, e.g. pinned in a
+  bottom corner. Root cause: #app and #settings-panel both use
+  backdrop-filter, which - like filter/transform - makes an element the
+  containing block for position:fixed descendants, so the list was
+  "fixed" to the panel's box (and clipped by its overflow:hidden) while
+  position() computed window coordinates. Proven by measuring: the open
+  list's bottom edge sat exactly on the panel's bottom edge, nowhere near
+  the button. Fix: makeDropdown moves each list to <body> once; the
+  outside-click check also treats clicks inside the list as inside; the
+  list closes when anything but itself scrolls (fixed to the window, it
+  would otherwise stay put while its button scrolls away); the browser
+  focus ring on the list is dropped (the highlighted row already shows
+  keyboard position). Audited all 3 dropdowns at 470 and 780px: anchored
+  4px below/above the button, inside the window, topmost at its center,
+  rows unclipped, picking/outside-click/scroll-close correct.
+- Changed: both gauge styles are fully opaque again, at the owner's
+  request (reverses the earlier translucency change; the antialiased
+  seam fix stays).
+- Fixed: the "Permanently excluded scope" heading below had been dropped
+  by an earlier log edit; restored.
+
+## Permanently excluded scope
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer
   is the only committed target for now.
