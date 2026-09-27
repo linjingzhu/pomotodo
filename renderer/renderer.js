@@ -34,6 +34,8 @@
     bgTint: document.getElementById('bg-tint'),
     bgPickBtn: document.getElementById('bg-pick-btn'),
     bgClearBtn: document.getElementById('bg-clear-btn'),
+    bgFitWidthBtn: document.getElementById('bg-fit-width-btn'),
+    bgFitHeightBtn: document.getElementById('bg-fit-height-btn'),
     bgBlur: document.getElementById('bg-blur'),
     bgTintColor: document.getElementById('bg-tint-color'),
     bgTintOpacity: document.getElementById('bg-tint-opacity'),
@@ -152,8 +154,12 @@
     document.documentElement.style.setProperty('--key', userAccentColor);
   }
 
+  // The image overhangs the widget by twice the blur radius, just enough
+  // to push blur's faded edge out of sight - and no more, so an unblurred
+  // image in a window matched to its ratio shows whole, uncropped.
   function applyBackgroundBlur(px) {
     el.bgImage.style.filter = `blur(${px}px)`;
+    el.bgImage.style.inset = `${-2 * px}px`;
   }
 
   function applyBackgroundTint(color, opacityPercent) {
@@ -161,8 +167,23 @@
     el.bgTint.style.opacity = String(opacityPercent / 100);
   }
 
+  // The image's own pixel size, for the "Match window to image ratio"
+  // buttons (null while there's no image, or it hasn't decoded yet).
+  let bgImageSize = null;
+  let bgImageToken = 0;
   function setBackgroundImage(dataUrl) {
     el.bgImage.style.backgroundImage = dataUrl ? `url(${dataUrl})` : 'none';
+    bgImageSize = null;
+    el.bgFitWidthBtn.disabled = el.bgFitHeightBtn.disabled = true;
+    const token = ++bgImageToken;
+    if (!dataUrl) return;
+    const img = new Image();
+    img.onload = () => {
+      if (token !== bgImageToken || !img.naturalWidth || !img.naturalHeight) return; // replaced meanwhile
+      bgImageSize = { width: img.naturalWidth, height: img.naturalHeight };
+      el.bgFitWidthBtn.disabled = el.bgFitHeightBtn.disabled = false;
+    };
+    img.src = dataUrl;
   }
 
   function currentDurationSec() {
@@ -514,6 +535,12 @@
     setBackgroundImage(null);
   });
 
+  for (const [btn, keep] of [[el.bgFitWidthBtn, 'width'], [el.bgFitHeightBtn, 'height']]) {
+    btn.addEventListener('click', () => {
+      if (bgImageSize) window.pomodoro.fitAspect(keep, bgImageSize.width, bgImageSize.height);
+    });
+  }
+
   el.bgBlur.addEventListener('input', () => applyBackgroundBlur(Number(el.bgBlur.value)));
   el.bgBlur.addEventListener('change', () => {
     window.pomodoro.saveSettings({ backgroundBlur: Number(el.bgBlur.value) });
@@ -570,6 +597,15 @@
     const btn = wrap.querySelector('.dropdown-btn');
     const label = wrap.querySelector('.dropdown-label');
     const list = wrap.querySelector('.dropdown-list');
+    // Moved to <body>: #app and #settings-panel both use backdrop-filter,
+    // which (like filter) makes an element the containing block for its
+    // fixed-position descendants - so a list left inside them isn't
+    // actually fixed to the window at all, it's "fixed" to that filtered
+    // ancestor's own box (and clipped by its overflow:hidden besides),
+    // landing the open list at some corner unrelated to the button. <body>
+    // has no such property, so position: fixed on the list means what it
+    // looks like it means.
+    document.body.appendChild(list);
     let highlighted = -1;
     const items = () => Array.from(list.children);
     const isOpen = () => !list.classList.contains('hidden');
@@ -665,8 +701,15 @@
       const li = e.target.closest('li');
       if (li) choose(items().indexOf(li));
     });
-    document.addEventListener('pointerdown', (e) => { if (isOpen() && !wrap.contains(e.target)) close(); }, true);
+    // list is no longer a descendant of wrap (see above), so a click
+    // inside it must be checked for separately or it would count as
+    // "outside" and close the list out from under its own click handler.
+    document.addEventListener('pointerdown', (e) => { if (isOpen() && !wrap.contains(e.target) && !list.contains(e.target)) close(); }, true);
     window.addEventListener('resize', () => { if (isOpen()) position(); });
+    // Fixed to the window, the list would stay put while its button
+    // scrolls away with the panel; close instead (but not when the list
+    // itself is being scrolled).
+    document.addEventListener('scroll', (e) => { if (isOpen() && !list.contains(e.target)) close(); }, true);
     build();
     return { refresh: build };
   }

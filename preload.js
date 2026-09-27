@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('pomodoro', {
   toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
   setPanelOpen: (open) => ipcRenderer.invoke('window:setPanelOpen', open),
   resetSize: () => ipcRenderer.invoke('window:resetSize'),
+  fitAspect: (keep, width, height) => ipcRenderer.invoke('window:fitAspect', { keep, width, height }),
   setProgress: (state, fraction, label) => ipcRenderer.send('window:progress', { state, fraction, label }),
   moveStart: () => ipcRenderer.send('window:moveStart'),
   moveEnd: () => ipcRenderer.send('window:moveEnd'),

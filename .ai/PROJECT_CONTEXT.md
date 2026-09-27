@@ -808,6 +808,50 @@ commands → the compile and build ladder and every report; `generated` →
   give the modal dialog reliable keyboard focus for Escape), but the
   branch is a direct no-op read of the same response value already
   proven correct for Quit.
+- Fixed (dropdown audit): every custom dropdown (Gauge style, Monitor,
+  Goals time zone) could open detached from its button, e.g. pinned in a
+  bottom corner. Root cause: #app and #settings-panel both use
+  backdrop-filter, which - like filter/transform - makes an element the
+  containing block for position:fixed descendants, so the list was
+  "fixed" to the panel's box (and clipped by its overflow:hidden) while
+  position() computed window coordinates. Proven by measuring: the open
+  list's bottom edge sat exactly on the panel's bottom edge, nowhere near
+  the button. Fix: makeDropdown moves each list to <body> once; the
+  outside-click check also treats clicks inside the list as inside; the
+  list closes when anything but itself scrolls (fixed to the window, it
+  would otherwise stay put while its button scrolls away); the browser
+  focus ring on the list is dropped (the highlighted row already shows
+  keyboard position). Audited all 3 dropdowns at 470 and 780px: anchored
+  4px below/above the button, inside the window, topmost at its center,
+  rows unclipped, picking/outside-click/scroll-close correct.
+- Changed: both gauge styles are fully opaque again, at the owner's
+  request (reverses the earlier translucency change; the antialiased
+  seam fix stays).
+- Fixed: the "Permanently excluded scope" heading below had been dropped
+  by an earlier log edit; restored.
+
+- Added: Settings > Background "Match window to image ratio" - Keep
+  width / Keep height resize the window so the widget (window minus
+  #app's 3px margins) has the background image's aspect ratio. The
+  renderer reads the image's natural size (any format Chromium decodes)
+  and main (fitAspect) keeps the named side, scales the whole result to
+  fit the display's work area and MIN_SIZE, keeps the top-left on
+  screen, and makes it the base size (panelGrowth set to 0, so an open
+  panel isn't grown on top of it and closing the panel doesn't shrink
+  it). Works pinned and from fullscreen, like Reset Size. Buttons are
+  disabled with no image. Also: #bg-image now overhangs the widget by 2x
+  the blur radius (was a fixed 40px) - the fixed overhang cropped ~30%
+  of an image even in a ratio-matched window; at blur 0 the image now
+  shows whole, at max blur (20) the overhang is the same 40px as before.
+  Verified against the real main.js under Xvfb: 1600x900 gives 1.777
+  from either button, panel-open keep-height clamps 1382 wide to
+  1024x579 (screen width) and survives closing/reopening the panel, a
+  1:2 image clamps to 515x1024, invalid input returns null, pinned
+  works, Clear disables the buttons, and the red frame of the test image
+  is fully visible at blur 0. Not verified: real Windows, multi-monitor
+  work areas, fullscreen path (no window manager under Xvfb).
+
+## Permanently excluded scope
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer
   is the only committed target for now.
