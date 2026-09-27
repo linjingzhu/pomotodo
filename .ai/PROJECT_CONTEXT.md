@@ -711,6 +711,44 @@ commands → the compile and build ladder and every report; `generated` →
   notification (an explicit user action, not an unattended completion).
   Verified: idle toggle, a <60s skip (nothing recorded), a 61s skip
   (recorded stopped-early, turns unchanged).
+- Goals tab overhaul, per the user ("Goal 개선"): a live clock, goal
+  groups, drag-and-drop reordering/filing, and per-item rename.
+  - Clock: date/weekday + HH:MM:SS (Intl.DateTimeFormat via
+    toLocaleDateString/toLocaleTimeString, so DST/zone data comes from
+    the bundled ICU, not hand-rolled offset math), a curated 10-zone
+    picker (Local/UTC/KST/JST/PT/ET/GMT/CET/IST/AEST) reusing
+    makeDropdown() from renderer.js (exposed as window.makeDropdown,
+    since panel.js loads after it in the same page - no module system
+    here). Persisted as settings.clockTimeZone. Ticks only while the
+    Goals tab is the active tab AND the panel is open (startClock/
+    stopClock from showTab()/panel-toggled).
+  - Groups: store.js gained a `groups` array (id/name/createdAt) and
+    goals gained `groupId` (null = ungrouped). listGoals() dropped
+    createdAt-based sorting for OPEN goals in favor of array position
+    being the manual order (addGoal now unshifts, so "newest first"
+    still holds until something is dragged); done goals are unaffected,
+    still sorted by doneAt desc, and not draggable (a history, not a
+    working set) - a deliberate scope cut from the request, which didn't
+    address done items specifically.
+  - Drag-and-drop uses the native HTML5 DnD API (draggable="true" +
+    dragstart/dragover/drop/dragend), not a custom pointer-driven one:
+    it gives the cursor-following ghost image for free (exactly what was
+    asked), and a thin border shows the drop line (before/after the
+    hovered row). Dropping on a group's header (or a differently-grouped
+    row) files the goal there via the new store.setGoalGroup, then
+    store.reorderGoal places it - added because, once goals can be
+    grouped, having no way to move one between groups after creation
+    would be a dead end; not explicitly requested, a natural extension
+    of the ask. Verified with synthetic DragEvent + a real DataTransfer
+    dispatched at the DOM (not xdotool - intra-page HTML5 DnD is a JS
+    protocol; this exercises the actual listeners end to end).
+  - Rename: an inline <input> swapped in for the title/name span on
+    click (Enter commits via renameGoal/renameGroup, Escape cancels,
+    blur commits like Enter) - same pattern for both goals and groups.
+  - "+ New Group" toggles into an inline input the same way, Enter-only
+    (blank or Escape cancels, no group is created).
+  - hasAnyRecords/resetAllRecords (Settings > Data) now also cover
+    groups.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

@@ -82,12 +82,25 @@
       </nav>
 
       <div id="tab-goals" class="tab" role="tabpanel" aria-labelledby="tab-btn-goals">
-        <form id="goal-form">
-          <input id="goal-input" type="text" maxlength="200" placeholder="Add a goal" />
-          <button type="submit" id="goal-add-btn">Add</button>
-        </form>
-        <p id="goals-empty" class="hint">Set a goal, then tick it off when you reach it. Reached goals also appear on that day in the Calendar tab.</p>
-        <ul id="goal-list"></ul>
+        <div id="goal-clock">
+          <div id="goal-clock-date"></div>
+          <div id="goal-clock-time"></div>
+        </div>
+        <div class="row">
+          <label id="goal-clock-tz-label">Time zone</label>
+          <div class="dropdown" id="goal-clock-tz-dropdown">
+            <button type="button" class="dropdown-btn" id="goal-clock-tz-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="goal-clock-tz-label goal-clock-tz-btn">
+              <span class="dropdown-label"></span>
+              <svg class="dropdown-caret" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </button>
+            <ul class="dropdown-list hidden" role="listbox" tabindex="-1" aria-labelledby="goal-clock-tz-label"></ul>
+          </div>
+          <select id="goal-clock-tz" class="hidden" aria-hidden="true" tabindex="-1"></select>
+        </div>
+
+        <p id="goals-empty" class="hint">Set a goal, then tick it off when you reach it. Reached goals also appear on that day in the Calendar tab. Drag a goal to reorder it, and drag it onto a group's title to file it there.</p>
+        <div id="goal-sections"></div>
+        <button type="button" id="add-group-btn">+ New Group</button>
       </div>
 
       <div id="tab-calendar" class="tab hidden" role="tabpanel" aria-labelledby="tab-btn-calendar">

@@ -734,14 +734,57 @@ select:focus {
   padding: 0 10px 32px 0;
 }
 
-/* Goals */
-#goal-form {
+/* Goals: the live clock, header. Time zone row (a .row) is styled by the
+   shared .row rules; its dropdown reuses .dropdown from Settings. */
+#goal-clock { text-align: center; margin-bottom: 4px; }
+#goal-clock-date { font-size: 11px; color: var(--text-muted); }
+/* The time is the emphasized part, per the user - larger, bold, in the
+   key color, with seconds. */
+#goal-clock-time {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* One section per group, plus the ungrouped "Goals" section (not
+   editable - no rename/delete) and, when there are any, a trailing
+   "Reached" section for every done goal across all groups. */
+.goal-section { margin-bottom: 4px; }
+.goal-section-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+.goal-section-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+/* A header is also a drop target: dropping a goal here files it into
+   this group. */
+.goal-section-header.drop-target {
+  outline: 1px dashed var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.goal-add-form {
   display: flex;
   gap: 6px;
+  margin-bottom: 4px;
 }
-#goal-input { flex: 1; }
-#goal-add-btn { padding: 4px 12px; font-size: 12px; }
-#goal-list {
+.goal-add-input { flex: 1; }
+.goal-add-btn { padding: 4px 12px; font-size: 12px; }
+#add-group-btn { align-self: center; font-size: 12px; padding: 4px 12px; }
+
+.goal-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -749,12 +792,19 @@ select:focus {
   flex-direction: column;
   gap: 4px;
 }
-#goal-list li {
+.goal-list li {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 2px;
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
 }
+.goal-list li[draggable="true"] { cursor: grab; }
+/* The insertion line at the drop position; the dragged row itself dims
+   (its native drag ghost already follows the cursor). */
+.goal-list li.drop-before { border-top-color: var(--accent); }
+.goal-list li.drop-after { border-bottom-color: var(--accent); }
 .goal-title {
   flex: 1;
   min-width: 0;
@@ -765,11 +815,11 @@ select:focus {
 .goal-title:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
 .goal-title:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 /* The goal currently set on the timer. */
-#goal-list li.current .goal-title {
+.goal-list li.current .goal-title {
   color: var(--accent);
   font-weight: 600;
 }
-#goal-list li.done .goal-title {
+.goal-list li.done .goal-title {
   text-decoration: line-through;
   color: var(--text-muted);
 }
@@ -779,6 +829,7 @@ select:focus {
   white-space: nowrap;
 }
 .goal-delete,
+.goal-rename,
 .row-delete {
   width: 20px;
   height: 20px;
@@ -789,7 +840,9 @@ select:focus {
   flex-shrink: 0;
 }
 .goal-delete:hover,
+.goal-rename:hover,
 .row-delete:hover { opacity: 1; }
+.rename-input { width: 100%; font-size: inherit; }
 
 /* Calendar */
 #cal-header {

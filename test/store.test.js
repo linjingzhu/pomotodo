@@ -58,7 +58,60 @@ test('adding an open goal that already exists (any case) reuses it', () => {
 
 test('a missing or corrupt file reads as empty', () => {
   const file = tempFile();
-  assert.deepStrictEqual(store.load(file), { sessions: [], goals: [] });
+  assert.deepStrictEqual(store.load(file), { sessions: [], goals: [], groups: [] });
   fs.writeFileSync(file, '{not json');
-  assert.deepStrictEqual(store.load(file), { sessions: [], goals: [] });
+  assert.deepStrictEqual(store.load(file), { sessions: [], goals: [], groups: [] });
+});
+
+test('a goal can be renamed', () => {
+  const file = tempFile();
+  const a = store.addGoal(file, 'Read chapter 5');
+  assert.strictEqual(store.renameGoal(file, a.id, '  Read chapter 6 ').title, 'Read chapter 6');
+  assert.strictEqual(store.renameGoal(file, a.id, '   '), null, 'a blank name is rejected');
+  assert.strictEqual(store.renameGoal(file, 'missing', 'x'), null);
+  assert.strictEqual(store.listGoals(file)[0].title, 'Read chapter 6');
+});
+
+test('open goals can be manually reordered; done goals are unaffected', () => {
+  const file = tempFile();
+  const a = store.addGoal(file, 'a');
+  const b = store.addGoal(file, 'b');
+  const c = store.addGoal(file, 'c');
+  assert.deepStrictEqual(store.listGoals(file).map((g) => g.title), ['c', 'b', 'a']);
+  store.reorderGoal(file, a.id, b.id); // move a to just before b
+  assert.deepStrictEqual(store.listGoals(file).map((g) => g.title), ['c', 'a', 'b']);
+  store.reorderGoal(file, c.id, null); // move c to the end
+  assert.deepStrictEqual(store.listGoals(file).map((g) => g.title), ['a', 'b', 'c']);
+  assert.strictEqual(store.reorderGoal(file, 'missing', a.id), null);
+});
+
+test('groups: create, rename, delete (members become ungrouped)', () => {
+  const file = tempFile();
+  assert.strictEqual(store.addGroup(file, '  '), null);
+  const work = store.addGroup(file, 'Work');
+  store.addGroup(file, 'Personal');
+  assert.deepStrictEqual(store.listGroups(file).map((g) => g.name), ['Work', 'Personal']);
+  assert.strictEqual(store.renameGroup(file, work.id, ' Job ').name, 'Job');
+  assert.strictEqual(store.renameGroup(file, 'missing', 'x'), null);
+
+  const a = store.addGoal(file, 'Ship it', work.id);
+  assert.strictEqual(a.groupId, work.id);
+  const b = store.addGoal(file, 'No group here', 'not-a-real-group-id');
+  assert.strictEqual(b.groupId, null, 'an unknown groupId falls back to ungrouped');
+
+  assert.strictEqual(store.deleteGroup(file, work.id).id, work.id);
+  assert.deepStrictEqual(store.listGroups(file).map((g) => g.name), ['Personal']);
+  assert.strictEqual(store.listGoals(file).find((g) => g.id === a.id).groupId, null, 'its goal is now ungrouped, not deleted');
+  assert.strictEqual(store.deleteGroup(file, 'missing'), null);
+});
+
+test('a goal can be filed into a different group by id, or ungrouped', () => {
+  const file = tempFile();
+  const work = store.addGroup(file, 'Work');
+  const play = store.addGroup(file, 'Play');
+  const a = store.addGoal(file, 'Ship it', work.id);
+  assert.strictEqual(store.setGoalGroup(file, a.id, play.id).groupId, play.id);
+  assert.strictEqual(store.setGoalGroup(file, a.id, null).groupId, null);
+  assert.strictEqual(store.setGoalGroup(file, a.id, 'not-a-real-id'), null, 'an unknown group is rejected');
+  assert.strictEqual(store.setGoalGroup(file, 'missing', work.id), null);
 });

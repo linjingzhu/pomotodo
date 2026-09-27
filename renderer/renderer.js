@@ -635,6 +635,9 @@
   }
   const gaugeDropdown = makeDropdown(el.gaugeStyle);
   const displayDropdown = makeDropdown(el.displaySelect);
+  // panel.js (loaded after this script) reuses this for the Goals tab's
+  // time zone picker - same reasoning, same widget.
+  window.makeDropdown = makeDropdown;
 
   let panelOpen = false;
   el.gearBtn.addEventListener('click', async () => {

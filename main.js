@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = {
   accentColor: '#f2405a',
   gaugeStyle: 'pie',
   panelSplit: 0.48, // the panel's share of #app's height, dragged via the splitter
+  clockTimeZone: '', // '' = the device's own zone; else an IANA name (Goals tab clock)
   currentTask: '',
   windowWidth: 340,
   windowHeight: 470,
@@ -715,11 +716,25 @@ ipcMain.handle('records:month', (_evt, month) => store.monthRecords(RECORDS_PATH
 
 ipcMain.handle('goals:list', () => store.listGoals(RECORDS_PATH));
 
-ipcMain.handle('goals:add', (_evt, title) => store.addGoal(RECORDS_PATH, title));
+ipcMain.handle('goals:add', (_evt, { title, groupId } = {}) => store.addGoal(RECORDS_PATH, title, groupId));
+
+ipcMain.handle('goals:rename', (_evt, { id, title }) => store.renameGoal(RECORDS_PATH, id, title));
 
 ipcMain.handle('goals:setDone', (_evt, { id, done }) => store.setGoalDone(RECORDS_PATH, id, done));
 
 ipcMain.handle('goals:delete', (_evt, id) => !!store.deleteGoal(RECORDS_PATH, id));
+
+ipcMain.handle('goals:reorder', (_evt, { id, beforeId }) => store.reorderGoal(RECORDS_PATH, id, beforeId));
+
+ipcMain.handle('goals:setGroup', (_evt, { id, groupId }) => store.setGoalGroup(RECORDS_PATH, id, groupId));
+
+ipcMain.handle('groups:list', () => store.listGroups(RECORDS_PATH));
+
+ipcMain.handle('groups:add', (_evt, name) => store.addGroup(RECORDS_PATH, name));
+
+ipcMain.handle('groups:rename', (_evt, { id, name }) => store.renameGroup(RECORDS_PATH, id, name));
+
+ipcMain.handle('groups:delete', (_evt, id) => !!store.deleteGroup(RECORDS_PATH, id));
 
 app.whenReady().then(() => {
   createWindow();
