@@ -52,11 +52,12 @@
   let mode = 'work'; // 'work' | 'break' | 'longBreak'
   // Focus sessions finished since the last long break (not persisted).
   let focusInCycle = 0;
-  // Time is kept by the wall clock, not by counting ticks: a hidden or
+  // Time is kept by a monotonic clock, not by counting ticks: a hidden or
   // minimized window's timers can be throttled to one wake-up a minute,
   // which made a tick-counting timer all but stop in the tray. Ticks only
   // sample the clock.
   let remainingMs = 25 * 60 * 1000;
+  let phaseDurationMs = remainingMs;
   let phaseEndAt = 0; // while running: when the current phase ends (ms)
   let lastTickAt = 0; // while running: the clock time already accounted for
   let workCarryMs = 0; // focus time not yet credited as a whole second
@@ -76,6 +77,8 @@
   // ticked (pauses excluded). Recorded when it completes, or when it's reset
   // after at least a minute of work.
   let session = null;
+  const pendingSessions = new Set();
+  const failedSessions = [];
   const MIN_RECORDED_SEC = 60;
 
   function fmt(sec) {
@@ -86,7 +89,7 @@
 
   function timerState() {
     if (running) return 'running';
-    return remainingMs === currentDurationSec() * 1000 ? 'idle' : 'paused';
+    return remainingMs === phaseDurationMs ? 'idle' : 'paused';
   }
 
   function render() {
@@ -95,7 +98,7 @@
     el.timerDisplay.textContent = fmt(Math.ceil(remainingMs / 1000));
     el.startPauseBtn.classList.toggle('running', running);
     el.startPauseBtn.title = running ? 'Pause' : 'Start';
-    const remainingFraction = remainingMs / (currentDurationSec() * 1000);
+    const remainingFraction = Math.max(0, Math.min(1, remainingMs / phaseDurationMs));
     // The arc spans [start, 360deg]; start advancing clockwise from 12
     // o'clock is the depleted portion growing clockwise.
     el.ringFill.style.setProperty('--ring-start', `${360 * (1 - remainingFraction)}deg`);
@@ -186,11 +189,17 @@
     img.src = dataUrl;
   }
 
+  function normalizedMinutes(input, fallback) {
+    const value = Number(input.value);
+    const min = Number(input.min);
+    const max = Number(input.max);
+    const minutes = Number.isFinite(value) && value > 0 ? value : fallback;
+    return Math.min(max, Math.max(min, Math.round(minutes)));
+  }
+
   function currentDurationSec() {
-    const minutes = mode === 'work' ? Number(el.workMin.value || 25)
-      : mode === 'longBreak' ? Number(el.longBreakMin.value || 15)
-        : Number(el.breakMin.value || 5);
-    return Math.max(1, minutes) * 60;
+    const input = mode === 'work' ? el.workMin : mode === 'longBreak' ? el.longBreakMin : el.breakMin;
+    return normalizedMinutes(input, mode === 'work' ? 25 : mode === 'longBreak' ? 15 : 5) * 60;
   }
 
   const PHASE_NAMES = { work: 'Focus', break: 'Break', longBreak: 'Long break' };
@@ -204,7 +213,8 @@
   function resetTimer() {
     stopTick();
     if (mode === 'work') finishSession(false);
-    remainingMs = currentDurationSec() * 1000;
+    phaseDurationMs = currentDurationSec() * 1000;
+    remainingMs = phaseDurationMs;
     running = false;
     render();
   }
@@ -233,25 +243,33 @@
     }
   }
 
-  function finishSession(completed) {
+  function finishSession(completed, endAt = Date.now()) {
     const done = session;
     session = null;
     workCarryMs = 0;
-    if (!done || (!completed && done.workedSec < MIN_RECORDED_SEC)) return;
-    window.pomodoro.addSession({
+    if (!done || (!completed && done.workedSec < MIN_RECORDED_SEC)) return Promise.resolve();
+    const record = {
       start: done.start,
-      end: new Date().toISOString(),
+      end: new Date(Math.max(endAt, Date.parse(done.start))).toISOString(),
       workedSec: done.workedSec,
       note: el.taskInput.value.trim(),
       completed,
-    }).then(() => window.dispatchEvent(new Event('session-recorded')));
+    };
+    const write = window.pomodoro.addSession(record).then(() => window.dispatchEvent(new Event('session-recorded')), (error) => {
+      failedSessions.push(record);
+      throw error;
+    });
+    pendingSessions.add(write);
+    write.finally(() => pendingSessions.delete(write)).catch(() => {});
+    write.catch(() => {}); // ordinary timer actions have no caller to await
+    return write;
   }
 
   // Every Nth finished focus session is followed by a long break.
-  function switchMode() {
+  function switchMode(boundaryWallAt) {
     if (mode === 'work') {
       totalTurns += 1;
-      finishSession(true);
+      finishSession(true, boundaryWallAt);
       focusInCycle += 1;
       const long = focusInCycle >= Math.max(2, Number(el.longBreakEvery.value || 4));
       if (long) focusInCycle = 0;
@@ -260,7 +278,8 @@
       mode = 'work';
     }
     saveStats();
-    remainingMs = currentDurationSec() * 1000;
+    phaseDurationMs = currentDurationSec() * 1000;
+    remainingMs = phaseDurationMs;
     applyModeColor();
     // `mode` is already the phase that's starting.
     const title = mode === 'work' ? 'Break is over' : 'Focus time is over';
@@ -279,7 +298,7 @@
   // Credits focus time in whole seconds; the remainder carries over.
   function creditWork(ms) {
     if (ms <= 0) return;
-    if (!session) session = { start: new Date(lastTickAt).toISOString(), workedSec: 0 };
+    if (!session) session = { start: new Date(runWallAt).toISOString(), workedSec: 0 };
     workCarryMs += ms;
     const whole = Math.floor(workCarryMs / 1000);
     workCarryMs -= whole * 1000;
@@ -300,7 +319,9 @@
       if (mode === 'work') creditWork(upTo - lastTickAt);
       lastTickAt = upTo;
       if (now < phaseEndAt) break;
-      switchMode();
+      const boundaryWallAt = Date.now() - (performance.now() - upTo);
+      switchMode(boundaryWallAt);
+      runWallAt = boundaryWallAt;
       if (!autoStartsCurrentPhase()) {
         // Waits at full time (idle) for Start.
         if (timerId) {
@@ -316,7 +337,7 @@
   }
 
   function tick() {
-    const now = Date.now();
+    const now = performance.now();
     if (now - lastTickAt > SLEEP_GAP_MS) {
       pauseAt(lastTickAt);
       return;
@@ -328,7 +349,8 @@
   function startTick() {
     if (timerId) return;
     running = true;
-    lastTickAt = Date.now();
+    lastTickAt = performance.now();
+    runWallAt = Date.now();
     phaseEndAt = lastTickAt + remainingMs;
     timerId = setInterval(tick, TICK_MS);
     render();
@@ -339,6 +361,7 @@
     if (timerId) {
       clearInterval(timerId);
       timerId = null;
+      if (at - lastTickAt > SLEEP_GAP_MS) at = lastTickAt;
       advanceTo(at);
     }
     if (unsavedStudySeconds > 0) saveStats();
@@ -347,11 +370,31 @@
   }
 
   function stopTick() {
-    pauseAt(Date.now());
+    pauseAt(performance.now());
   }
 
+  let runWallAt = 0;
+
+  // Main waits for this promise before closing the renderer. Retain failed
+  // records so a later close attempt can retry without duplicating successes.
+  window.pomodoro.onPrepareQuit(async () => {
+    await initialized;
+    stopTick();
+    if (mode === 'work') await finishSession(false);
+    const writes = [...pendingSessions];
+    const settled = await Promise.allSettled(writes);
+    if (settled.some((result) => result.status === 'rejected')) throw new Error('Could not save a focus session');
+    while (failedSessions.length) {
+      const record = failedSessions[0];
+      await window.pomodoro.addSession(record);
+      failedSessions.shift();
+      window.dispatchEvent(new Event('session-recorded'));
+    }
+    await window.pomodoro.saveSettings({ totalTurns, totalStudySeconds });
+  });
+
   // The PC going to sleep pauses the timer; it stays paused after waking.
-  window.pomodoro.onSuspend(() => stopTick());
+  window.pomodoro.onSuspend(() => pauseAt(lastTickAt));
 
   el.startPauseBtn.addEventListener('click', () => {
     window.pomodoro.closeNotification();
@@ -379,7 +422,8 @@
       mode = 'work';
     }
     applyModeColor();
-    remainingMs = currentDurationSec() * 1000;
+    phaseDurationMs = currentDurationSec() * 1000;
+    remainingMs = phaseDurationMs;
     saveStats();
     render();
   });
@@ -396,28 +440,37 @@
     mode = 'work';
     focusInCycle = 0;
     applyModeColor();
-    remainingMs = currentDurationSec() * 1000;
+    phaseDurationMs = currentDurationSec() * 1000;
+    remainingMs = phaseDurationMs;
     totalTurns = 0;
     totalStudySeconds = 0;
     saveStats();
     render();
   });
 
-  // Changing minute inputs while stopped updates the visible countdown immediately.
+  // Editing a duration updates an idle phase, leaving a paused one intact.
   el.workMin.addEventListener('change', () => {
-    window.pomodoro.saveSettings({ workMinutes: Number(el.workMin.value) });
-    if (!running && mode === 'work') resetTimer();
+    const minutes = normalizedMinutes(el.workMin, 25);
+    el.workMin.value = minutes;
+    window.pomodoro.saveSettings({ workMinutes: minutes });
+    if (timerState() === 'idle' && mode === 'work') resetTimer();
   });
   el.breakMin.addEventListener('change', () => {
-    window.pomodoro.saveSettings({ breakMinutes: Number(el.breakMin.value) });
-    if (!running && mode === 'break') resetTimer();
+    const minutes = normalizedMinutes(el.breakMin, 5);
+    el.breakMin.value = minutes;
+    window.pomodoro.saveSettings({ breakMinutes: minutes });
+    if (timerState() === 'idle' && mode === 'break') resetTimer();
   });
   el.longBreakMin.addEventListener('change', () => {
-    window.pomodoro.saveSettings({ longBreakMinutes: Number(el.longBreakMin.value) });
-    if (!running && mode === 'longBreak') resetTimer();
+    const minutes = normalizedMinutes(el.longBreakMin, 15);
+    el.longBreakMin.value = minutes;
+    window.pomodoro.saveSettings({ longBreakMinutes: minutes });
+    if (timerState() === 'idle' && mode === 'longBreak') resetTimer();
   });
   el.longBreakEvery.addEventListener('change', () => {
-    window.pomodoro.saveSettings({ longBreakEvery: Number(el.longBreakEvery.value) });
+    const count = normalizedMinutes(el.longBreakEvery, 4);
+    el.longBreakEvery.value = count;
+    window.pomodoro.saveSettings({ longBreakEvery: count });
   });
   el.autoStartBreaks.addEventListener('change', () => {
     window.pomodoro.saveSettings({ autoStartBreaks: el.autoStartBreaks.checked });
@@ -798,10 +851,26 @@
   }
 
   let goalCheckToken = 0;
+  let cachedGoals = null;
+  let goalsRequest = null;
+  function getGoals() {
+    if (cachedGoals) return Promise.resolve(cachedGoals);
+    if (!goalsRequest) {
+      const request = window.pomodoro.listGoals();
+      goalsRequest = request;
+      request.then((goals) => {
+        if (goalsRequest === request) cachedGoals = goals;
+      }).catch(() => {}).finally(() => {
+        if (goalsRequest === request) goalsRequest = null;
+      });
+    }
+    return goalsRequest;
+  }
+
   async function refreshGoalCheck() {
     const token = ++goalCheckToken;
     el.goalField.classList.toggle('has-goal', !!el.taskInput.value.trim());
-    const goal = matchGoal(await window.pomodoro.listGoals());
+    const goal = matchGoal(await getGoals());
     if (token !== goalCheckToken) return; // a newer refresh is on its way
     const reached = !!(goal && goal.doneAt);
     el.goalCheck.setAttribute('aria-checked', String(reached));
@@ -814,7 +883,7 @@
   el.goalCheck.addEventListener('click', async () => {
     const title = el.taskInput.value.trim();
     if (!title) return;
-    const goals = await window.pomodoro.listGoals();
+    const goals = await getGoals();
     const goal = matchGoal(goals);
     if (goal && goal.doneAt) {
       await window.pomodoro.setGoalDone(goal.id, false);
@@ -832,7 +901,12 @@
     window.dispatchEvent(new Event('goals-changed'));
   });
 
-  ['goals-changed', 'task-changed'].forEach((name) => window.addEventListener(name, refreshGoalCheck));
+  window.addEventListener('goals-changed', () => {
+    cachedGoals = null;
+    goalsRequest = null;
+    refreshGoalCheck();
+  });
+  window.addEventListener('task-changed', refreshGoalCheck);
   el.taskInput.addEventListener('input', refreshGoalCheck);
 
   el.cornerButtons.forEach((btn) => {
@@ -901,15 +975,18 @@
   window.addEventListener('session-recorded', refreshResetRecordsBtn);
 
   el.resetConfigBtn.addEventListener('click', async () => {
+    const wasIdle = timerState() === 'idle';
     const settings = await window.pomodoro.resetConfig();
     applyConfigToUI(settings);
     setBackgroundImage(null); // resetConfig also drops the stored copy
     // Matches editing Work/Break directly: only while idle, so a running
     // or paused countdown is never yanked out from under the user.
-    if (!running && (mode === 'work' || mode === 'break' || mode === 'longBreak')) resetTimer();
+    if (wasIdle && !running) resetTimer();
+    else render();
   });
 
   async function init() {
+    const backgroundToken = bgImageToken;
     const [settings, background, version] = await Promise.all([
       window.pomodoro.getSettings(),
       window.pomodoro.getBackgroundImage(),
@@ -917,12 +994,13 @@
     ]);
     applyConfigToUI(settings);
     setPinButtonState(settings.sizeLocked);
-    if (background) setBackgroundImage(background.dataUrl);
+    if (background && backgroundToken === bgImageToken) setBackgroundImage(background.dataUrl);
     el.taskInput.value = settings.currentTask;
     refreshGoalCheck();
     totalTurns = settings.totalTurns;
     totalStudySeconds = settings.totalStudySeconds;
-    remainingMs = currentDurationSec() * 1000;
+    phaseDurationMs = currentDurationSec() * 1000;
+    remainingMs = phaseDurationMs;
     render();
     el.aboutVersion.textContent = `v${version}`;
     await populateDisplays();
@@ -931,5 +1009,5 @@
 
   window.pomodoro.onPointerInside((inside) => el.app.classList.toggle('pointer-inside', inside));
 
-  init();
+  const initialized = init();
 })();

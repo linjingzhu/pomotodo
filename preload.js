@@ -4,6 +4,17 @@ contextBridge.exposeInMainWorld('pomodoro', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (partial) => ipcRenderer.invoke('settings:save', partial),
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  onPrepareQuit: (callback) => {
+    ipcRenderer.on('app:prepareQuit', async () => {
+      try {
+        await callback();
+        ipcRenderer.send('app:quitPrepared', null);
+      } catch {
+        ipcRenderer.send('app:quitPrepared', true);
+      }
+    });
+    ipcRenderer.send('app:rendererReady');
+  },
   resetConfig: () => ipcRenderer.invoke('settings:resetConfig'),
   setAlwaysOnTop: (flag) => ipcRenderer.invoke('window:setAlwaysOnTop', flag),
   setSizeLocked: (flag) => ipcRenderer.invoke('window:setSizeLocked', flag),
