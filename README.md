@@ -29,7 +29,8 @@ Release로 올립니다. 버전은 electron-builder가 요구하는 semver 형�
 2. 완료되면 `dist` 폴더에 `PomodoroTimer-Portable-<버전>.exe`가 생성됩니다
    (설치 없이 바로 실행하는 포터블 버전. 설치형은 만들지 않음)
 
-Node.js가 없다면 https://nodejs.org (LTS 버전) 설치 후 진행하세요.
+Node.js 22.13 이상(22.x) 또는 24 이상이 필요합니다. https://nodejs.org 에서
+LTS 버전을 설치한 뒤 진행하세요.
 
 ### 빌드가 실패할 때 (dist 폴더가 안 생길 때)
 
@@ -45,6 +46,19 @@ Node.js가 없다면 https://nodejs.org (LTS 버전) 설치 후 진행하세요.
 npm install
 npm start
 ```
+
+## 정적 검사와 회귀 테스트
+
+```sh
+npm ci
+npm run check
+npm run dist -- --publish never
+```
+
+`check`는 ESLint와 Node 테스트를 실행합니다. 타이머의 시계 변경·절전·일시정지,
+종료 시 기록 저장과 실패 재시도, 기록 파일 보존, 창 수명주기를 검증합니다.
+운영체제의 실제 절전·알림·다중 모니터 동작은 Windows에서 별도로 확인해야 합니다.
+배경 이미지는 최대 20 MB까지 읽으며, 더 큰 파일을 선택하면 오류를 표시합니다.
 
 ## 구현된 기능
 

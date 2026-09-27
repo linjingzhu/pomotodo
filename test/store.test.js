@@ -63,6 +63,25 @@ test('a missing or corrupt file reads as empty', () => {
   assert.deepStrictEqual(store.load(file), { sessions: [], goals: [], groups: [] });
 });
 
+test('mutations preserve corrupt or invalid records instead of silently replacing history', () => {
+  const file = tempFile();
+  for (const raw of ['{not json', 'null', '{"sessions":{}}', '{"goals":[null]}']) {
+    fs.writeFileSync(file, raw);
+    assert.throws(() => store.addGoal(file, 'Keep history'));
+    assert.strictEqual(fs.readFileSync(file, 'utf8'), raw);
+  }
+  store.resetAllRecords(file);
+  assert.deepStrictEqual(store.load(file), { sessions: [], goals: [], groups: [] });
+});
+
+test('a self-drop keeps the goal order', () => {
+  const file = tempFile();
+  const a = store.addGoal(file, 'a');
+  const b = store.addGoal(file, 'b');
+  store.reorderGoal(file, b.id, b.id);
+  assert.deepStrictEqual(store.listGoals(file).map((g) => g.id), [b.id, a.id]);
+});
+
 test('a goal can be renamed', () => {
   const file = tempFile();
   const a = store.addGoal(file, 'Read chapter 5');

@@ -9,11 +9,20 @@ function emptyStore() {
   return { sessions: [], goals: [], groups: [] };
 }
 
-function load(file) {
+function load(file, strict = false) {
   try {
     const data = JSON.parse(fs.readFileSync(file, 'utf-8'));
-    return { sessions: data.sessions || [], goals: data.goals || [], groups: data.groups || [] };
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid records file');
+    for (const key of ['sessions', 'goals', 'groups']) {
+      if (data[key] !== undefined && (!Array.isArray(data[key]) || data[key].some((item) => !item || typeof item !== 'object'))) {
+        throw new Error(`Invalid records collection: ${key}`);
+      }
+    }
+    return { sessions: data.sessions ?? [], goals: data.goals ?? [], groups: data.groups ?? [] };
   } catch (e) {
+    // Read-only views may recover to empty, but a failed read must never
+    // turn the next mutation into an overwrite of existing history.
+    if (strict && e.code !== 'ENOENT') throw e;
     return emptyStore();
   }
 }
@@ -26,9 +35,9 @@ function save(file, data) {
 }
 
 function update(file, fn) {
-  const data = load(file);
+  const data = load(file, true);
   const result = fn(data);
-  save(file, data);
+  if (result !== null) save(file, data);
   return result;
 }
 
@@ -158,6 +167,7 @@ function reorderGoal(file, id, beforeId) {
   return update(file, (data) => {
     const from = data.goals.findIndex((g) => g.id === id);
     if (from === -1) return null;
+    if (id === beforeId) return { ...data.goals[from] };
     const [goal] = data.goals.splice(from, 1);
     const to = beforeId ? data.goals.findIndex((g) => g.id === beforeId) : -1;
     data.goals.splice(to === -1 ? data.goals.length : to, 0, goal);
@@ -210,11 +220,7 @@ function hasAnyRecords(file) {
 // records"). Settings (settings.json) are untouched; see resetConfig in
 // main.js.
 function resetAllRecords(file) {
-  update(file, (data) => {
-    data.sessions = [];
-    data.goals = [];
-    data.groups = [];
-  });
+  save(file, emptyStore());
 }
 
 module.exports = {

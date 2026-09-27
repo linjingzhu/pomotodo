@@ -58,12 +58,22 @@
   ];
   let clockTimeZone = '';
   let clockTimer = null;
+  let clockFormatters;
+
+  function setClockZone(zone) {
+    clockTimeZone = TIME_ZONES.some(([value]) => value === zone) ? zone : '';
+    const opts = clockTimeZone ? { timeZone: clockTimeZone } : {};
+    clockFormatters = {
+      date: new Intl.DateTimeFormat('en-US', { ...opts, weekday: 'short', month: 'short', day: 'numeric' }),
+      time: new Intl.DateTimeFormat('en-GB', { ...opts, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+    };
+  }
+  setClockZone('');
 
   function renderClock() {
-    const opts = clockTimeZone ? { timeZone: clockTimeZone } : {};
     const now = new Date();
-    $('goal-clock-date').textContent = now.toLocaleDateString('en-US', { ...opts, weekday: 'short', month: 'short', day: 'numeric' });
-    $('goal-clock-time').textContent = now.toLocaleTimeString('en-GB', { ...opts, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    $('goal-clock-date').textContent = clockFormatters.date.format(now);
+    $('goal-clock-time').textContent = clockFormatters.time.format(now);
   }
   function startClock() {
     renderClock();
@@ -77,12 +87,12 @@
   TIME_ZONES.forEach(([value, label]) => tzSelect.appendChild(make('option', { value, textContent: label })));
   const tzDropdown = window.makeDropdown(tzSelect);
   tzSelect.addEventListener('change', () => {
-    clockTimeZone = tzSelect.value;
+    setClockZone(tzSelect.value);
     api.saveSettings({ clockTimeZone });
     renderClock();
   });
   api.getSettings().then((settings) => {
-    clockTimeZone = settings.clockTimeZone || '';
+    setClockZone(settings.clockTimeZone || '');
     tzSelect.value = clockTimeZone;
     tzDropdown.refresh();
     renderClock();
@@ -329,6 +339,7 @@
   let viewMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   let selectedDay = dayKey(today);
   let monthData = { sessions: [], goalsDone: [] };
+  let monthRequest = 0;
 
   // Level 0 is under an hour of focus that day (no color); each further
   // hour is one darker step, capped at the 4th (4h or more).
@@ -337,11 +348,15 @@
   }
 
   async function loadMonth() {
-    monthData = await api.getMonthRecords(monthKey(viewMonth));
+    const request = ++monthRequest;
+    const data = await api.getMonthRecords(monthKey(viewMonth));
+    if (request !== monthRequest) return;
+    monthData = data;
     renderMonth();
   }
 
   function renderMonth() {
+    const currentDay = dayKey(new Date());
     $('cal-title').textContent = viewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     const perDay = {};
     monthData.sessions.forEach((s) => {
@@ -356,7 +371,7 @@
       const key = dayKey(new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d));
       const sec = perDay[key] || 0;
       const cell = make('button', { className: `cal-day level-${level(sec)}`, textContent: String(d) });
-      if (key === dayKey(today)) cell.classList.add('today');
+      if (key === currentDay) cell.classList.add('today');
       if (key === selectedDay) cell.classList.add('selected');
       const date = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       cell.title = sec ? `${date} · ${duration(sec)} of focus` : `${date} · No focus sessions`;

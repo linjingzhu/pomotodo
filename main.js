@@ -45,10 +45,25 @@ const IMAGE_MIME_TYPES = {
 
 // Settings only ever store a file name; the data URL is rebuilt on demand
 // so settings.json stays small.
-function imageFileToDataUrl(filePath) {
+const MAX_BACKGROUND_BYTES = 20 * 1024 * 1024;
+async function imageFileToDataUrl(filePath) {
   const mime = IMAGE_MIME_TYPES[path.extname(filePath).toLowerCase()];
   if (!mime) return null;
-  const buffer = fs.readFileSync(filePath);
+  const file = await fs.promises.open(filePath, 'r');
+  let buffer;
+  try {
+    const { size } = await file.stat();
+    if (size > MAX_BACKGROUND_BYTES) throw new Error('Choose a background image smaller than 20 MB.');
+    buffer = Buffer.alloc(size);
+    let offset = 0;
+    while (offset < size) {
+      const { bytesRead } = await file.read(buffer, offset, size - offset, offset);
+      if (!bytesRead) throw new Error('The image changed while being read. Please choose it again.');
+      offset += bytesRead;
+    }
+  } finally {
+    await file.close();
+  }
   return `data:${mime};base64,${buffer.toString('base64')}`;
 }
 
@@ -63,16 +78,12 @@ function loadSettings() {
 
 function saveSettings(partial) {
   const merged = { ...loadSettings(), ...partial };
-  try {
-    fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
-    // Written aside, then swapped in: a crash or power loss mid-write can't
-    // leave a truncated file, which would reset every setting and total.
-    const tmp = `${SETTINGS_PATH}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(merged, null, 2), 'utf-8');
-    fs.renameSync(tmp, SETTINGS_PATH);
-  } catch (e) {
-    // best effort; ignore write failures
-  }
+  fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
+  // Written aside, then swapped in: a crash or power loss mid-write can't
+  // leave a truncated file, which would reset every setting and total.
+  const tmp = `${SETTINGS_PATH}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2), 'utf-8');
+  fs.renameSync(tmp, SETTINGS_PATH);
   return merged;
 }
 
@@ -143,7 +154,15 @@ function createWindow() {
     // (without the height the open panel added)
     if (!isFullscreen()) {
       const [w, h] = mainWindow.getSize();
-      saveSettings({ windowWidth: w, windowHeight: Math.max(MIN_SIZE.height, h - (panelGrowth ? panelGrowth.dh : 0)) });
+      try {
+        saveSettings({ windowWidth: w, windowHeight: Math.max(MIN_SIZE.height, h - (panelGrowth ? panelGrowth.dh : 0)) });
+      } catch {
+        event.preventDefault();
+        app.isQuitting = false;
+        quitReady = false;
+        dialog.showErrorBox('Could not save settings', 'Free disk space or check folder permissions, then try closing again.');
+        return;
+      }
     }
     // A real quit (from the tray menu, or window-all-closed on non-mac) must
     // go through; only an interactive close (the in-app close button) can be
@@ -184,6 +203,10 @@ function createWindow() {
   });
 
   mainWindow.on('leave-full-screen', onLeaveFullscreen);
+  mainWindow.on('blur', stopDrag);
+  mainWindow.on('hide', stopDrag);
+  mainWindow.on('closed', stopDrag);
+  mainWindow.webContents.on('render-process-gone', stopDrag);
 
   // Esc leaves fullscreen.
   mainWindow.webContents.on('before-input-event', (event, input) => {
@@ -288,6 +311,7 @@ const CONFIG_KEYS = [
   'accentColor', 'gaugeStyle', 'panelSplit',
 ];
 ipcMain.handle('settings:resetConfig', () => {
+  backgroundRequest++;
   removeStoredBackgrounds(null);
   const defaults = {};
   for (const key of CONFIG_KEYS) defaults[key] = DEFAULT_SETTINGS[key];
@@ -444,8 +468,11 @@ ipcMain.handle('window:snapToCorner', (_evt, { displayId, corner }) => {
 function withResizeUnlocked(fn) {
   const wasLocked = !mainWindow.isResizable();
   if (wasLocked) mainWindow.setResizable(true);
-  fn();
-  if (wasLocked) mainWindow.setResizable(false);
+  try {
+    fn();
+  } finally {
+    if (wasLocked && !mainWindow.isDestroyed()) mainWindow.setResizable(false);
+  }
 }
 
 // Fullscreen state is tracked here rather than read back from the OS:
@@ -496,6 +523,7 @@ function onLeaveFullscreen() {
 }
 
 function toggleFullscreen() {
+  stopDrag();
   if (isFullscreen()) {
     exitFullscreen();
     return false;
@@ -681,18 +709,21 @@ function removeStoredBackgrounds(keep) {
 function storeBackgroundImage(sourcePath) {
   const ext = path.extname(sourcePath).toLowerCase();
   if (!IMAGE_MIME_TYPES[ext]) return null;
+  if (fs.statSync(sourcePath).size > MAX_BACKGROUND_BYTES) throw new Error('Choose a background image smaller than 20 MB.');
   const dir = app.getPath('userData');
   fs.mkdirSync(dir, { recursive: true });
   const name = `background${ext}`;
   const tmp = path.join(dir, `${name}.tmp`);
   fs.copyFileSync(sourcePath, tmp); // copied aside, then swapped in
-  removeStoredBackgrounds(name);
   fs.renameSync(tmp, path.join(dir, name));
+  removeStoredBackgrounds(name);
   saveSettings({ backgroundImageFile: name, backgroundImagePath: null });
   return name;
 }
 
+let backgroundRequest = 0;
 ipcMain.handle('background:pick', async () => {
+  const request = ++backgroundRequest;
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Choose background image',
     properties: ['openFile'],
@@ -700,21 +731,24 @@ ipcMain.handle('background:pick', async () => {
   });
   if (result.canceled || !result.filePaths[0]) return null;
   try {
-    const dataUrl = imageFileToDataUrl(result.filePaths[0]);
-    if (!dataUrl) return null;
+    const dataUrl = await imageFileToDataUrl(result.filePaths[0]);
+    if (!dataUrl || request !== backgroundRequest) return null;
     storeBackgroundImage(result.filePaths[0]);
     return { dataUrl };
   } catch (e) {
+    dialog.showErrorBox('Could not load background', e.message);
     return null;
   }
 });
 
 ipcMain.handle('background:clear', () => {
+  backgroundRequest++;
   removeStoredBackgrounds(null);
   saveSettings({ backgroundImageFile: null, backgroundImagePath: null });
 });
 
-ipcMain.handle('background:get', () => {
+ipcMain.handle('background:get', async () => {
+  const request = backgroundRequest;
   let { backgroundImageFile: name, backgroundImagePath: original } = loadSettings();
   // Before 1.0.8 only the original's path was kept: take a copy now, while
   // it's still there (if it's gone, the setting is left for a later try).
@@ -727,8 +761,8 @@ ipcMain.handle('background:get', () => {
   }
   if (!name) return null;
   try {
-    const dataUrl = imageFileToDataUrl(path.join(app.getPath('userData'), path.basename(name)));
-    return dataUrl ? { dataUrl } : null;
+    const dataUrl = await imageFileToDataUrl(path.join(app.getPath('userData'), path.basename(name)));
+    return dataUrl && request === backgroundRequest ? { dataUrl } : null;
   } catch (e) {
     return null;
   }
@@ -795,7 +829,10 @@ ipcMain.handle('groups:rename', (_evt, { id, name }) => store.renameGroup(RECORD
 
 ipcMain.handle('groups:delete', (_evt, id) => !!store.deleteGroup(RECORDS_PATH, id));
 
-app.whenReady().then(() => {
+// A second process would race on the same JSON files and overwrite totals.
+const ownsInstance = app.requestSingleInstanceLock();
+if (!ownsInstance) app.quit();
+else app.whenReady().then(() => {
   createWindow();
   createTray();
 
@@ -804,8 +841,50 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('before-quit', () => {
+app.on('second-instance', showWindow);
+
+let quitPending = false;
+let quitReady = false;
+let rendererReady = false;
+let quitTimeout = null;
+ipcMain.on('app:rendererReady', (event) => {
+  if (event.sender !== mainWindow?.webContents) return;
+  rendererReady = true;
+  if (quitPending) mainWindow.webContents.send('app:prepareQuit');
+});
+app.on('before-quit', (event) => {
   app.isQuitting = true;
+  if (quitReady || !mainWindow || mainWindow.isDestroyed()
+      || mainWindow.webContents.isDestroyed() || mainWindow.webContents.isCrashed()) return;
+  event.preventDefault();
+  if (quitPending) return;
+  quitPending = true;
+  if (rendererReady) mainWindow.webContents.send('app:prepareQuit');
+  quitTimeout = setTimeout(async () => {
+    if (!quitPending) return;
+    quitPending = false;
+    app.isQuitting = false;
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: 'warning', title: 'Session save did not respond',
+      message: 'The timer did not respond. Keep it open to retry, or quit without saving the current session?',
+      buttons: ['Keep Open', 'Quit Without Saving'], defaultId: 0, cancelId: 0,
+    });
+    if (response === 1) { quitReady = true; app.quit(); }
+  }, 10000);
+});
+
+ipcMain.on('app:quitPrepared', (event, error) => {
+  if (!quitPending || event.sender !== mainWindow?.webContents) return;
+  clearTimeout(quitTimeout);
+  quitPending = false;
+  if (error) {
+    app.isQuitting = false;
+    showWindow();
+    dialog.showErrorBox('Could not save session', 'Your session could not be saved. Free disk space or check folder permissions, then try quitting again.');
+    return;
+  }
+  quitReady = true;
+  app.quit();
 });
 
 app.on('window-all-closed', () => {
