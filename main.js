@@ -157,11 +157,9 @@ function createWindow() {
       try {
         saveSettings({ windowWidth: w, windowHeight: Math.max(MIN_SIZE.height, h - (panelGrowth ? panelGrowth.dh : 0)) });
       } catch {
-        event.preventDefault();
-        app.isQuitting = false;
-        quitReady = false;
-        dialog.showErrorBox('Could not save settings', 'Free disk space or check folder permissions, then try closing again.');
-        return;
+        // Only the remembered window size is lost (the session and totals
+        // were saved, or knowingly abandoned, before quitting). Blocking
+        // here would trap the app open on a read-only or full disk.
       }
     }
     // A real quit (from the tray menu, or window-all-closed on non-mac) must
@@ -888,7 +886,14 @@ ipcMain.on('app:quitPrepared', (event, error) => {
   if (error) {
     app.isQuitting = false;
     showWindow();
-    dialog.showErrorBox('Could not save session', 'Your session could not be saved. Free disk space or check folder permissions, then try quitting again.');
+    // Retrying can never succeed when the failure is permanent (a damaged
+    // records file, a read-only folder), so quitting must stay possible.
+    dialog.showMessageBox(mainWindow, {
+      type: 'warning', title: 'Could not save session',
+      message: 'Your focus session could not be saved.',
+      detail: 'The records file may be damaged, the disk full, or the folder read-only. Keep the app open to retry, or quit without saving this session. A damaged records file can be replaced with Settings > Data > Reset All Records.',
+      buttons: ['Keep Open', 'Quit Without Saving'], defaultId: 0, cancelId: 0,
+    }).then(({ response }) => { if (response === 1) { quitReady = true; app.quit(); } });
     return;
   }
   quitReady = true;
