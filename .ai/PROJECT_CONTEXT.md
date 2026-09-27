@@ -768,8 +768,46 @@ commands → the compile and build ladder and every report; `generated` →
   `docs/OWNER_ACTIONS.md`: the one remaining step (Settings → Pages →
   Source: "Deploy from a branch" → `gh-pages` / `(root)`) needs the repo
   owner, since no available tool can flip that toggle.
-
-## Permanently excluded scope
+- Fixed: the progress ring's pie-cut edge showed a jagged/stair-stepped
+  diagonal line, and the fill looked opaque near the moving edge instead
+  of translucent throughout. Root cause: the mask's sector conic-gradient
+  used true 0-width hard stops (transparent directly to #000 at the same
+  angle) - conic-gradient hard stops render without antialiasing, so the
+  cut line came out jagged instead of a clean radial edge. Fix: a 0.75deg
+  angular blend at each mask edge (still visually a hard cut, but now
+  antialiased) plus lower alpha on the fill gradient's near-opaque end
+  (0.85 → 0.5 fill mode, solid → 0.55 stroke mode) so the whole disc reads
+  as translucent, not just its faded far side. Verified via a headless
+  Xvfb screenshot with a zoomed crop on the seam.
+- Fixed: the Goals tab's time zone dropdown showed badly clipped labels
+  ("KST (", "PT (L", ...) plus both a vertical and a horizontal scrollbar.
+  Root cause: makeDropdown's position() forced the list's width to match
+  its trigger button's width exactly - fine for Settings' Gauge
+  style/Monitor buttons (already wide enough for their own short options),
+  but the Goals tab's compact "Local ▾" button is far narrower than
+  labels like "KST (Seoul)". Fixed generally (not just for this one
+  dropdown): the list now measures its own natural (max-content) width
+  and widens to fit the longest option, never narrower than the button;
+  measured with max-height/overflow-y suspended so a soon-to-appear
+  vertical scrollbar's width isn't carved out of the very box being
+  measured (which was clipping rows by exactly the scrollbar's width even
+  after the main fix, until a SCROLLBAR_WIDTH probe compensated for it).
+  Verified via a headless Xvfb screenshot; re-checked the Settings tab's
+  two dropdowns for regressions (unaffected - already wide enough).
+- Added: the in-app close (X) button now asks before acting, instead of
+  silently quitting (when "Close to tray" is off, the default) with no
+  warning at all. A native confirm dialog (same style as the existing
+  Reset Session/Reset All Records confirms) offers Quit, Hide to Tray, or
+  Cancel. "Close to tray (keeps running)" in Settings is unchanged - when
+  it's on, close still hides immediately without asking, since that's an
+  explicit standing choice. Verified end-to-end under Xvfb + xdotool:
+  clicking close blocks on the dialog (the app doesn't quit or hide on
+  its own), and pressing Enter (the default "Quit" button) does trigger a
+  real app.quit() (before-quit/will-quit both fired). The Cancel path
+  couldn't be reliably automated here (no window manager under Xvfb to
+  give the modal dialog reliable keyboard focus for Escape), but the
+  branch is a direct no-op read of the same response value already
+  proven correct for Quit.
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer
   is the only committed target for now.

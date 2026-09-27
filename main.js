@@ -148,10 +148,30 @@ function createWindow() {
     // A real quit (from the tray menu, or window-all-closed on non-mac) must
     // go through; only an interactive close (the in-app close button) can be
     // redirected.
-    if (!app.isQuitting && loadSettings().closeToTray) {
+    if (app.isQuitting) return;
+    if (loadSettings().closeToTray) {
       event.preventDefault();
       mainWindow.hide();
+      return;
     }
+    // Not set to always keep running: ask first rather than quitting (and
+    // dropping a running session) on a single click with no warning.
+    event.preventDefault();
+    dialog.showMessageBox(mainWindow, {
+      type: 'question',
+      buttons: ['Quit', 'Hide to Tray', 'Cancel'],
+      defaultId: 0,
+      cancelId: 2,
+      title: 'Close Pomodoro Timer?',
+      message: 'Quit, or keep it running in the tray?',
+    }).then(({ response }) => {
+      if (response === 0) {
+        app.isQuitting = true;
+        app.quit();
+      } else if (response === 1) {
+        mainWindow.hide();
+      }
+    });
   });
 
   // Minimizing hides to the tray instead of the taskbar, when enabled; the

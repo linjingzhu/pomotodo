@@ -546,6 +546,18 @@
     window.pomodoro.saveSettings({ accentColor: el.accentColor.value });
   });
 
+  // A dropdown list's actual scrollbar width (0 on a platform/theme with
+  // overlay scrollbars) - measured once, used to keep a list that needs to
+  // scroll from clipping its own rows by exactly the scrollbar's width.
+  const SCROLLBAR_WIDTH = (() => {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;visibility:hidden;overflow:scroll;width:50px;height:50px;';
+    document.body.appendChild(probe);
+    const width = probe.offsetWidth - probe.clientWidth;
+    probe.remove();
+    return width;
+  })();
+
   // A custom-styled view onto a hidden <select>: a native <select> popup's
   // highlighted-row color follows the OS accent and can't be restyled with
   // CSS (a longstanding Chromium limitation), which is why Gauge style and
@@ -580,9 +592,34 @@
     function position() {
       const r = btn.getBoundingClientRect();
       const margin = 4;
-      list.style.left = `${Math.round(r.left)}px`;
-      list.style.width = `${Math.round(r.width)}px`;
-      const estHeight = Math.min(list.scrollHeight || items().length * 28 + 8, 200);
+      // Never narrower than the button, but grown to fit the longest
+      // option - a compact trigger button (e.g. the Goals tab's time zone
+      // picker, showing just "Local") must not force-clip a list whose
+      // items ("KST (Seoul)", ...) are much longer than the button itself.
+      // Measured with the list's own max-height/overflow-y suspended (and
+      // .hidden - display:none, which reports 0 for scrollWidth - removed):
+      // otherwise a list tall enough to need its vertical scrollbar would
+      // have that scrollbar's width carved out of the very box being
+      // measured, clipping the rows by exactly that width.
+      const wasHidden = list.classList.contains('hidden');
+      if (wasHidden) { list.classList.remove('hidden'); list.style.visibility = 'hidden'; }
+      list.style.maxHeight = 'none';
+      list.style.overflowY = 'visible';
+      list.style.width = 'max-content';
+      const naturalWidth = list.scrollWidth;
+      const naturalHeight = list.scrollHeight;
+      list.style.maxHeight = '';
+      list.style.overflowY = '';
+      const needsVScroll = naturalHeight > 200;
+      const width = Math.min(
+        Math.max(Math.round(r.width), naturalWidth + (needsVScroll ? SCROLLBAR_WIDTH : 0)),
+        window.innerWidth - margin * 2
+      );
+      list.style.width = `${width}px`;
+      const estHeight = Math.min(naturalHeight, 200);
+      if (wasHidden) { list.classList.add('hidden'); list.style.visibility = ''; }
+      const left = Math.min(Math.round(r.left), window.innerWidth - width - margin);
+      list.style.left = `${Math.max(margin, left)}px`;
       const spaceBelow = window.innerHeight - r.bottom;
       // Opens downward unless there's not enough room but more room above.
       if (spaceBelow < estHeight + margin && r.top > spaceBelow) {
