@@ -115,3 +115,11 @@ test('quit saves one ongoing session and retries a failed write', async () => {
   await app.pomodoro.prepareQuit();
   assert.equal(app.calls.sessions.length, 2);
 });
+
+test('the close button asks main to close instead of calling window.close()', async () => {
+  let closes = 0;
+  const app = createRenderer({ pomodoro: { closeWindow: () => { closes++; } } });
+  await app.flush();
+  app.emit('close-btn', 'click');
+  assert.equal(closes, 1);
+});

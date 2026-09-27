@@ -40,6 +40,8 @@ async function launch(t, ownsInstance = true) {
     setResizable(value) { this.resizable = value; }
     setBounds() {}
     setFullScreen() {}
+    close() { this.closeCalls = (this.closeCalls || 0) + 1; }
+    hide() { this.hidden = true; }
     show() {}
     focus() {}
   }
@@ -112,6 +114,30 @@ test('unresponsive renderer offers a bounded quit recovery', async (t) => {
   h.app.quit();
   await [...h.timeouts.values()].at(-1)();
   assert.equal(h.quits(), 1);
+});
+
+test('the close button closes through main, and only for its own window', async (t) => {
+  const h = await launch(t);
+  h.ipcMain.emit('window:close', { sender: {} });
+  assert.equal(h.win.closeCalls, undefined);
+  h.ipcMain.emit('window:close', { sender: h.win.webContents });
+  assert.equal(h.win.closeCalls, 1);
+});
+
+test('closing asks Quit / Hide to Tray / Cancel unless close-to-tray is on', async (t) => {
+  const h = await launch(t);
+  const asked = [];
+  h.electron.dialog.showMessageBox = async (_win, options) => { asked.push(options.buttons); return { response: 2 }; };
+  let prevented = false;
+  h.win.emit('close', { preventDefault() { prevented = true; } });
+  await Promise.resolve();
+  assert.equal(prevented, true);
+  assert.equal(JSON.stringify(asked), JSON.stringify([['Quit', 'Hide to Tray', 'Cancel']]));
+  assert.equal(h.win.hidden, undefined);
+  await h.handlers.get('window:setCloseToTray')({}, true);
+  h.win.emit('close', { preventDefault() {} });
+  assert.equal(asked.length, 1);
+  assert.equal(h.win.hidden, true);
 });
 
 test('close reports settings write failures instead of throwing', async (t) => {

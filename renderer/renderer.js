@@ -496,7 +496,7 @@
   });
 
   el.closeBtn.addEventListener('click', () => {
-    window.close();
+    window.pomodoro.closeWindow();
   });
 
   function setPinButtonState(locked) {

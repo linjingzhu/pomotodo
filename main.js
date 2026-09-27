@@ -600,6 +600,14 @@ function resetSize() {
 
 ipcMain.handle('window:resetSize', () => resetSize());
 
+// The in-app close button. A page's own window.close() destroys the window
+// without emitting BrowserWindow 'close' (so the Quit / Hide to Tray
+// question never ran); closing it from here goes through 'close' like the
+// OS close does.
+ipcMain.on('window:close', (event) => {
+  if (event.sender === mainWindow?.webContents) mainWindow.close();
+});
+
 // Settings > Background "Keep width" / "Keep height": resize so the widget
 // (the window minus #app's 3px margins) has the background image's aspect
 // ratio, keeping the named dimension. Scaled as a whole to stay within the
