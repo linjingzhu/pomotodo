@@ -38,6 +38,10 @@
     bgTintOpacity: document.getElementById('bg-tint-opacity'),
     accentColor: document.getElementById('accent-color'),
     gaugeStyle: document.getElementById('gauge-style'),
+    panelSplitter: document.getElementById('panel-splitter'),
+    resetRecordsBtn: document.getElementById('reset-records-btn'),
+    resetConfigBtn: document.getElementById('reset-config-btn'),
+    aboutVersion: document.getElementById('about-version'),
   };
 
 
@@ -432,7 +436,7 @@
   el.fullscreenBtn.addEventListener('click', () => window.pomodoro.toggleFullscreen());
   el.resetSizeBtn.addEventListener('click', () => window.pomodoro.resetSize());
   // Spots where a press or double-click means something of its own.
-  const INTERACTIVE = 'button, input, select, textarea, label, [role="button"], #settings-panel, #resize-handles';
+  const INTERACTIVE = 'button, input, select, textarea, label, [role="button"], #settings-panel, #resize-handles, #panel-splitter';
 
   // Double-clicking the widget flips fullscreen <-> windowed, except on its
   // controls (and the panel).
@@ -520,6 +524,96 @@
     window.pomodoro.saveSettings({ accentColor: el.accentColor.value });
   });
 
+  // A custom-styled view onto a hidden <select>: a native <select> popup's
+  // highlighted-row color follows the OS accent and can't be restyled with
+  // CSS (a longstanding Chromium limitation), which is why Gauge style and
+  // Monitor didn't match the rest of the glass UI. The real <select> (see
+  // index.html, class "hidden") keeps its value and fires its usual
+  // change event, so every existing listener on it keeps working; this is
+  // only a view, rebuilt from its <option>s whenever asked to refresh.
+  function makeDropdown(select) {
+    const wrap = select.previousElementSibling;
+    const btn = wrap.querySelector('.dropdown-btn');
+    const label = wrap.querySelector('.dropdown-label');
+    const list = wrap.querySelector('.dropdown-list');
+    let highlighted = -1;
+    const items = () => Array.from(list.children);
+    const isOpen = () => !list.classList.contains('hidden');
+
+    function sync() {
+      const selected = select.selectedOptions[0];
+      label.textContent = selected ? selected.textContent : '';
+      items().forEach((li) => li.setAttribute('aria-selected', String(li.dataset.value === select.value)));
+    }
+    function build() {
+      list.replaceChildren(...Array.from(select.options).map((opt) => {
+        const li = document.createElement('li');
+        li.textContent = opt.textContent;
+        li.dataset.value = opt.value;
+        li.setAttribute('role', 'option');
+        return li;
+      }));
+      sync();
+    }
+    function position() {
+      const r = btn.getBoundingClientRect();
+      const margin = 4;
+      list.style.left = `${Math.round(r.left)}px`;
+      list.style.width = `${Math.round(r.width)}px`;
+      const estHeight = Math.min(list.scrollHeight || items().length * 28 + 8, 200);
+      const spaceBelow = window.innerHeight - r.bottom;
+      // Opens downward unless there's not enough room but more room above.
+      if (spaceBelow < estHeight + margin && r.top > spaceBelow) {
+        list.style.top = 'auto';
+        list.style.bottom = `${Math.round(window.innerHeight - r.top + margin)}px`;
+      } else {
+        list.style.bottom = 'auto';
+        list.style.top = `${Math.round(r.bottom + margin)}px`;
+      }
+    }
+    function highlight(i) {
+      highlighted = i;
+      items().forEach((li, idx) => li.classList.toggle('highlighted', idx === i));
+    }
+    function open() {
+      if (isOpen()) return;
+      build(); // Monitor's options can change between opens
+      position();
+      list.classList.remove('hidden');
+      btn.setAttribute('aria-expanded', 'true');
+      highlight(items().findIndex((li) => li.dataset.value === select.value));
+      list.focus();
+    }
+    function close() {
+      if (!isOpen()) return;
+      list.classList.add('hidden');
+      btn.setAttribute('aria-expanded', 'false');
+      btn.focus();
+    }
+    function choose(i) {
+      const li = items()[i];
+      if (!li) return;
+      select.value = li.dataset.value;
+      select.dispatchEvent(new Event('change'));
+      sync();
+      close();
+    }
+    btn.addEventListener('click', () => (isOpen() ? close() : open()));
+    list.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); close(); } else if (e.key === 'ArrowDown') { e.preventDefault(); highlight(Math.min(items().length - 1, highlighted + 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(Math.max(0, highlighted - 1)); } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(highlighted); }
+    });
+    list.addEventListener('click', (e) => {
+      const li = e.target.closest('li');
+      if (li) choose(items().indexOf(li));
+    });
+    document.addEventListener('pointerdown', (e) => { if (isOpen() && !wrap.contains(e.target)) close(); }, true);
+    window.addEventListener('resize', () => { if (isOpen()) position(); });
+    build();
+    return { refresh: build };
+  }
+  const gaugeDropdown = makeDropdown(el.gaugeStyle);
+  const displayDropdown = makeDropdown(el.displaySelect);
+
   let panelOpen = false;
   el.gearBtn.addEventListener('click', async () => {
     panelOpen = !panelOpen;
@@ -527,9 +621,47 @@
     // back after it hides, so the timer is never squeezed in between.
     if (panelOpen) await window.pomodoro.setPanelOpen(true);
     el.settingsPanel.classList.toggle('hidden', !panelOpen);
+    el.app.classList.toggle('panel-open', panelOpen); // shows the splitter
     if (!panelOpen) await window.pomodoro.setPanelOpen(false);
     window.dispatchEvent(new CustomEvent('panel-toggled', { detail: panelOpen }));
   });
+
+  // Drags the panel's share of #app's height (--panel-split, a percentage
+  // so it holds across window sizes), clamped in pixels so neither side
+  // can be dragged out of usefulness regardless of the window's height.
+  (() => {
+    const MIN_PANEL_PX = 100;
+    const MIN_MAIN_PX = 90;
+    let dragging = false;
+    let startY = 0;
+    let startPx = 0;
+    let appHeight = 0;
+    const currentPct = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--panel-split')) || 48;
+    el.panelSplitter.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      dragging = true;
+      el.panelSplitter.classList.add('dragging');
+      el.panelSplitter.setPointerCapture(e.pointerId);
+      startY = e.clientY;
+      appHeight = el.app.getBoundingClientRect().height;
+      startPx = (currentPct() / 100) * appHeight;
+    });
+    el.panelSplitter.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      // Dragging up grows the panel (its share is measured from the bottom).
+      const panelPx = Math.min(appHeight - MIN_MAIN_PX, Math.max(MIN_PANEL_PX, startPx + (startY - e.clientY)));
+      document.documentElement.style.setProperty('--panel-split', `${(panelPx / appHeight) * 100}%`);
+    });
+    const end = () => {
+      if (!dragging) return;
+      dragging = false;
+      el.panelSplitter.classList.remove('dragging');
+      window.pomodoro.saveSettings({ panelSplit: currentPct() / 100 });
+    };
+    el.panelSplitter.addEventListener('pointerup', end);
+    el.panelSplitter.addEventListener('lostpointercapture', end);
+  })();
 
   // The session's goal. Enter confirms it and adds it to the Goals list;
   // picking a goal in that list sets it here (panel.js).
@@ -614,13 +746,13 @@
       opt.textContent = d.label;
       el.displaySelect.appendChild(opt);
     });
+    displayDropdown.refresh();
   }
 
-  async function init() {
-    const [settings, background] = await Promise.all([
-      window.pomodoro.getSettings(),
-      window.pomodoro.getBackgroundImage(),
-    ]);
+  // Every value the Settings tab shows, applied to the UI - shared by
+  // init() and by Reset Configuration, which fetches fresh defaults from
+  // main and re-applies them the same way.
+  function applyConfigToUI(settings) {
     el.workMin.value = settings.workMinutes;
     el.breakMin.value = settings.breakMinutes;
     el.longBreakMin.value = settings.longBreakMinutes;
@@ -629,7 +761,6 @@
     el.autoStartFocus.checked = settings.autoStartFocus;
     el.notifyOnPhaseChange.checked = settings.notifyOnPhaseChange;
     el.alwaysTop.checked = settings.alwaysOnTop;
-    setPinButtonState(settings.sizeLocked);
     el.minimizeToTray.checked = settings.minimizeToTray;
     el.closeToTray.checked = settings.closeToTray;
     el.bgBlur.value = settings.backgroundBlur;
@@ -638,10 +769,49 @@
     el.accentColor.value = settings.accentColor;
     el.gaugeStyle.value = settings.gaugeStyle;
     el.app.dataset.gauge = settings.gaugeStyle;
+    gaugeDropdown.refresh();
     userAccentColor = settings.accentColor;
     applyModeColor();
     applyBackgroundBlur(settings.backgroundBlur);
     applyBackgroundTint(settings.backgroundTintColor, Math.round(settings.backgroundTintOpacity * 100));
+    document.documentElement.style.setProperty('--panel-split', `${settings.panelSplit * 100}%`);
+  }
+
+  // Data section: delete every Goal/Calendar record, or reset every
+  // Settings value to its default. Both confirm risk in their own way -
+  // records ask first (and the button is disabled with nothing to lose),
+  // config reset doesn't ask (it's easy to re-pick a color or a minute
+  // value) but does undo itself just as completely.
+  async function refreshResetRecordsBtn() {
+    el.resetRecordsBtn.disabled = !(await window.pomodoro.hasAnyRecords());
+  }
+  el.resetRecordsBtn.addEventListener('click', async () => {
+    if (!(await window.pomodoro.confirmResetAllRecords())) return;
+    await window.pomodoro.resetAllRecords();
+    window.dispatchEvent(new Event('goals-changed'));
+    window.dispatchEvent(new Event('session-recorded'));
+    refreshResetRecordsBtn();
+  });
+  window.addEventListener('goals-changed', refreshResetRecordsBtn);
+  window.addEventListener('session-recorded', refreshResetRecordsBtn);
+
+  el.resetConfigBtn.addEventListener('click', async () => {
+    const settings = await window.pomodoro.resetConfig();
+    applyConfigToUI(settings);
+    setBackgroundImage(null); // resetConfig also drops the stored copy
+    // Matches editing Work/Break directly: only while idle, so a running
+    // or paused countdown is never yanked out from under the user.
+    if (!running && (mode === 'work' || mode === 'break' || mode === 'longBreak')) resetTimer();
+  });
+
+  async function init() {
+    const [settings, background, version] = await Promise.all([
+      window.pomodoro.getSettings(),
+      window.pomodoro.getBackgroundImage(),
+      window.pomodoro.getVersion(),
+    ]);
+    applyConfigToUI(settings);
+    setPinButtonState(settings.sizeLocked);
     if (background) setBackgroundImage(background.dataUrl);
     el.taskInput.value = settings.currentTask;
     refreshGoalCheck();
@@ -649,7 +819,9 @@
     totalStudySeconds = settings.totalStudySeconds;
     remainingMs = currentDurationSec() * 1000;
     render();
+    el.aboutVersion.textContent = `v${version}`;
     await populateDisplays();
+    await refreshResetRecordsBtn();
   }
 
   window.pomodoro.onPointerInside((inside) => el.app.classList.toggle('pointer-inside', inside));

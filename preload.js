@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('pomodoro', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (partial) => ipcRenderer.invoke('settings:save', partial),
+  getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  resetConfig: () => ipcRenderer.invoke('settings:resetConfig'),
   setAlwaysOnTop: (flag) => ipcRenderer.invoke('window:setAlwaysOnTop', flag),
   setSizeLocked: (flag) => ipcRenderer.invoke('window:setSizeLocked', flag),
   toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
@@ -29,6 +31,9 @@ contextBridge.exposeInMainWorld('pomodoro', {
   addSession: (session) => ipcRenderer.invoke('records:addSession', session),
   updateSessionNote: (id, note) => ipcRenderer.invoke('records:updateNote', { id, note }),
   deleteSession: (id) => ipcRenderer.invoke('records:deleteSession', id),
+  hasAnyRecords: () => ipcRenderer.invoke('records:hasAny'),
+  confirmResetAllRecords: () => ipcRenderer.invoke('confirm:resetAllRecords'),
+  resetAllRecords: () => ipcRenderer.invoke('records:resetAll'),
   getMonthRecords: (month) => ipcRenderer.invoke('records:month', month),
   listGoals: () => ipcRenderer.invoke('goals:list'),
   addGoal: (title) => ipcRenderer.invoke('goals:add', title),

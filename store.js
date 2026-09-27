@@ -115,6 +115,20 @@ function deleteGoal(file, id) {
   });
 }
 
+function hasAnyRecords(file) {
+  const data = load(file);
+  return data.sessions.length > 0 || data.goals.length > 0;
+}
+
+// Wipes every session and goal (the Data section's "reset all records").
+// Settings (settings.json) are untouched; see resetConfig in main.js.
+function resetAllRecords(file) {
+  update(file, (data) => {
+    data.sessions = [];
+    data.goals = [];
+  });
+}
+
 module.exports = {
   load,
   localDay,
@@ -126,4 +140,6 @@ module.exports = {
   addGoal,
   setGoalDone,
   deleteGoal,
+  hasAnyRecords,
+  resetAllRecords,
 };

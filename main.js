@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
   backgroundTintOpacity: 0,
   accentColor: '#f2405a',
   gaugeStyle: 'pie',
+  panelSplit: 0.48, // the panel's share of #app's height, dragged via the splitter
   currentTask: '',
   windowWidth: 340,
   windowHeight: 470,
@@ -251,6 +252,32 @@ function createTray() {
 // ---- IPC handlers used by the renderer (UI) ----
 
 ipcMain.handle('settings:get', () => loadSettings());
+
+ipcMain.handle('app:getVersion', () => app.getVersion());
+
+// The Data section's "Reset configuration": every Settings-tab value
+// (not the running totals, the current goal, the window's size/position,
+// or the records themselves - those have their own reset already) back
+// to its default, including dropping the stored background image copy.
+const CONFIG_KEYS = [
+  'workMinutes', 'breakMinutes', 'longBreakMinutes', 'longBreakEvery',
+  'autoStartBreaks', 'autoStartFocus', 'notifyOnPhaseChange',
+  'alwaysOnTop', 'minimizeToTray', 'closeToTray',
+  'backgroundBlur', 'backgroundTintColor', 'backgroundTintOpacity',
+  'accentColor', 'gaugeStyle', 'panelSplit',
+];
+ipcMain.handle('settings:resetConfig', () => {
+  removeStoredBackgrounds(null);
+  const defaults = {};
+  for (const key of CONFIG_KEYS) defaults[key] = DEFAULT_SETTINGS[key];
+  defaults.backgroundImageFile = null;
+  defaults.backgroundImagePath = null;
+  // alwaysOnTop is the one Settings value also mirrored live onto the
+  // window (see window:setAlwaysOnTop); writing the default to
+  // settings.json alone wouldn't un-set it if it was already on.
+  mainWindow.setAlwaysOnTop(defaults.alwaysOnTop);
+  return saveSettings(defaults);
+});
 
 ipcMain.handle('settings:save', (_evt, partial) => saveSettings(partial));
 
@@ -660,6 +687,29 @@ ipcMain.handle('records:addSession', (_evt, session) => store.addSession(RECORDS
 ipcMain.handle('records:updateNote', (_evt, { id, note }) => store.updateSession(RECORDS_PATH, id, { note }));
 
 ipcMain.handle('records:deleteSession', (_evt, id) => !!store.deleteSession(RECORDS_PATH, id));
+
+ipcMain.handle('records:hasAny', () => store.hasAnyRecords(RECORDS_PATH));
+
+// The Data section's "Reset all records": every session and goal, gone.
+// Asks first (separately from Reset Session's own confirm, different
+// wording since this is Goals/Calendar data, not the running totals).
+ipcMain.handle('confirm:resetAllRecords', async () => {
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    buttons: ['Delete All Records', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Delete all records?',
+    message: 'Delete every Goal and every Calendar session?',
+    detail: 'This removes all saved goals and focus-session history on this PC. It can\'t be undone.',
+  });
+  return result.response === 0;
+});
+
+ipcMain.handle('records:resetAll', () => {
+  store.resetAllRecords(RECORDS_PATH);
+  return true;
+});
 
 ipcMain.handle('records:month', (_evt, month) => store.monthRecords(RECORDS_PATH, month));
 

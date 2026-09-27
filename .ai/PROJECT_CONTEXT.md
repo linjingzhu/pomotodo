@@ -643,6 +643,55 @@ commands → the compile and build ladder and every report; `generated` →
   - Reset Session now confirms first via dialog.showMessageBox (Reset
     Session / Cancel, Cancel is the default and Escape's target) -
     verified by mocking showMessageBox for both answers.
+- Settings tab overhaul, per the user, same release as 1.0.11's fixes
+  (still on the same branch/PR at the time of writing):
+  - Grouped under titled sections (Timer/Window/Display/Background/
+    Appearance/Data), .group-title headings replacing the old <hr>s.
+  - Monitor and Gauge style are now a custom dropdown (makeDropdown() in
+    renderer.js): a native <select> popup's highlighted-row color follows
+    the OS accent and isn't restylable with CSS (a longstanding Chromium
+    limitation) - confirmed by screenshot, the selected row was OS blue
+    against this app's pink/red key color. The real <select> stays in the
+    DOM (class "hidden") for its value and change event, so every
+    existing listener on it is unchanged; the dropdown is only a view,
+    rebuilt from its current <option>s on open (so Monitor's dynamic list
+    stays live) and after any programmatic value/option change (a
+    `.refresh()` call at each such site).
+  - A draggable splitter (#panel-splitter, between main and
+    #settings-panel) sets --panel-split, the panel's share of #app's
+    height as a percentage (persisted as `panelSplit`, default 0.48 -
+    matching the old fixed 48%), clamped in pixels (both sides keep at
+    least ~90-100px) so it scales sanely across window sizes.
+  - Data section: "Reset All Records" (store.hasAnyRecords/
+    resetAllRecords; disabled with nothing to lose; confirms via a
+    second native dialog, separate wording from Reset Session's) and
+    "Reset Configuration" (settings:resetConfig - every CONFIG_KEYS
+    value back to DEFAULT_SETTINGS, drops the stored background image
+    copy, and - since alwaysOnTop is the one setting also mirrored live
+    onto the window - calls mainWindow.setAlwaysOnTop(false) directly,
+    since writing settings.json alone wouldn't un-set it. No confirm, by
+    the user's own spec: reversible by hand, unlike deleting records).
+    Both call the same applyConfigToUI(settings), extracted from init().
+  - About footer: "Designed by Lim Jeongsu" and the version
+    (app:getVersion -> Electron's app.getVersion(), which reads
+    package.json correctly only when launched as the real app (`electron
+    .`/packaged) - confirmed 0.1 that way; invoking main.js from an
+    external script, as most of this project's own throwaway test
+    harnesses do, makes Electron report its own version instead. Not a
+    product bug; the harness invocation is the anomaly.)
+  - Versioning scheme changed at the user's request: 0.x from here on,
+    x +1 each build, jumping to 1.0 only once declared the official
+    release. This build is 0.1 (package.json), a deliberate "downgrade"
+    in the number - confirmed harmless: release.yml only checks whether
+    a `v<version>` tag/release already exists, never compares ordering.
+  - Lesson (costly mid-session): `git checkout -- main.js`, meant to
+    discard one throwaway debug line added on top of substantial
+    uncommitted feature work, discarded the whole file back to HEAD -
+    silently dropping panelSplit/app:getVersion/resetConfig/hasAnyRecords/
+    resetAllRecords until an E2E rerun surfaced "no handler registered"
+    and the loss was diagnosed and every handler re-applied. `git
+    checkout`/`restore` on a file mid-feature is never the right way to
+    undo a small addition - edit it back out instead, or stash first.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

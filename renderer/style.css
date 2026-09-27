@@ -375,6 +375,7 @@ button {
 }
 button:hover { background: rgba(255, 255, 255, 0.24); }
 button:active { transform: scale(0.96); }
+button:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 
 #start-pause-btn,
 #reset-btn {
@@ -407,13 +408,28 @@ button:active { transform: scale(0.96); }
   flex-direction: column;
   gap: 8px;
   overflow: hidden;
-  /* One fixed height for every tab, so switching tabs never moves the timer
-     above; short tabs leave space at the bottom, long ones scroll. */
-  flex: 0 0 48%;
+  /* The panel's share of #app's height, as a fraction so it holds across
+     window sizes; the splitter drags --panel-split, default 48%. */
+  flex: 0 0 var(--panel-split, 48%);
   min-height: 0;
   -webkit-app-region: no-drag;
 }
 #settings-panel.hidden { display: none; }
+
+/* Drags the main/panel split. A thin strip, only there (and only
+   hit-testable) while the panel is open - #app.panel-open is set
+   alongside #settings-panel.hidden being toggled off. */
+#panel-splitter {
+  flex: 0 0 auto;
+  height: 5px;
+  margin: -3px 0;
+  border-radius: 3px;
+  cursor: ns-resize;
+  display: none;
+  -webkit-app-region: no-drag;
+}
+#app.panel-open #panel-splitter { display: block; }
+#panel-splitter:hover, #panel-splitter.dragging { background: rgba(255, 255, 255, 0.18); }
 
 .button-group {
   display: flex;
@@ -432,6 +448,77 @@ button:active { transform: scale(0.96); }
   flex: 1;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
+
+/* Section headings in the Settings tab. */
+.group-title {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.group-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
+/* A dropdown, styled to match the rest of the glass UI - unlike a native
+   <select> popup, whose highlighted-row color follows the OS accent and
+   can't be restyled with CSS. The real <select> (same id, .hidden) stays
+   in the DOM for its value and change event; this is a view onto it. */
+.dropdown { position: relative; }
+.dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  max-width: 150px;
+}
+.dropdown-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.dropdown-caret { flex-shrink: 0; opacity: 0.7; transition: transform 0.15s ease; }
+.dropdown-btn[aria-expanded="true"] .dropdown-caret { transform: rotate(180deg); }
+.dropdown-list {
+  position: fixed;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: #26262e;
+  box-shadow: var(--glass-shadow-sm);
+}
+.dropdown-list li {
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dropdown-list li:hover,
+.dropdown-list li.highlighted { background: rgba(255, 255, 255, 0.1); }
+.dropdown-list li[aria-selected="true"] { color: var(--accent); font-weight: 600; }
+
+#about {
+  margin-top: 18px;
+  padding-top: 10px;
+  border-top: 1px solid var(--glass-border);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+#about p { margin: 2px 0; }
 
 input[type="number"] {
   width: 60px;
