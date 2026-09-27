@@ -259,6 +259,20 @@ main {
   initial-value: 360deg;
 }
 
+/* The canvas-drawn gauge styles (renderer.js GAUGE_DRAW). It overhangs
+   the ring by GAUGE_PAD (12px) so glows aren't clipped at its edge. */
+#ring-canvas {
+  position: absolute;
+  inset: -12px;
+  width: calc(100% + 24px);
+  height: calc(100% + 24px);
+  display: none;
+  pointer-events: none;
+}
+#app[data-gauge-kind="canvas"] #ring-canvas { display: block; }
+#app[data-gauge-kind="canvas"] #ring-glow,
+#app[data-gauge-kind="canvas"] #timer-ring svg { display: none; }
+
 #ring-glow {
   position: absolute;
   inset: 0;
