@@ -851,6 +851,40 @@ commands → the compile and build ladder and every report; `generated` →
   is fully visible at blur 0. Not verified: real Windows, multi-monitor
   work areas, fullscreen path (no window manager under Xvfb).
 
+- Adversarial review of #12-#17 (two fresh reviewers on a different
+  model, one for #14/#16 UI, one for #17 incl. the Electron 33->44 upgrade
+  and release pipeline), plus an owner-reported bug. Fixed:
+  - Owner-reported: the close (X) button never asked Quit / Hide to Tray.
+    Root cause is #14 itself, not the Electron upgrade: the button called
+    the page's window.close(), which destroys the window without emitting
+    BrowserWindow 'close' (reproduced identically on Electron 33 and 44),
+    so the dialog code never ran. #14's "verification" misread the app
+    quitting (before-quit/will-quit after the window died) as the dialog's
+    Quit working. Lesson: when verifying an interactive prompt, assert the
+    prompt itself was shown (stub dialog.showMessageBox and count calls),
+    never infer it from what happened afterwards. The button now sends
+    IPC 'window:close' -> mainWindow.close(); tests cover it.
+  - #17 (Major): with a damaged records.json or a read-only data folder
+    the app could never quit: every pre-quit save failed and the only
+    answer was "try again". Now Keep Open / Quit Without Saving; a failed
+    window-size save no longer cancels a close; a damaged records file
+    keeps Reset All Records enabled (hasAnyRecords reads strictly).
+  - #16 (Major): a dropdown opened from a half-hidden button closed
+    immediately (the focus-induced scroll hit close-on-scroll). The list
+    now follows its button while the holder scrolls and closes only once
+    the button is out of view; closing no longer scrolls the panel back.
+  - #14 (Minor): the mask's edge blend left a faint notch at 12 o'clock on
+    a full ring (measured); the blend now narrows to 0 where there's no cut.
+  - #17 (Minor): the Goals clock on "Local" stayed on the old zone after
+    an OS time zone change (cached formatters); rebuilt on a change.
+  - #17 (Minor): no test failed when pauseAt's sleep clamp was removed;
+    added one (fails without the clamp).
+  Not changed: the paused state dims the ring to 40% (a deliberate state
+  signal predating the "fully opaque" request; owner's call).
+  Not verified (need real Windows): logoff/shutdown with the pre-quit save
+  handshake, whether performance.now() advances across sleep, Windows 10
+  support in Electron 44 / Chromium 152, lists over the rounded corners.
+
 ## Permanently excluded scope
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer

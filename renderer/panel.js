@@ -71,6 +71,9 @@
   setClockZone('');
 
   function renderClock() {
+    // "Local" follows the OS time zone, which can change while the app runs;
+    // a formatter keeps the zone it was built with, so rebuild on a change.
+    if (!clockTimeZone && clockFormatters.time.resolvedOptions().timeZone !== new Intl.DateTimeFormat().resolvedOptions().timeZone) setClockZone('');
     const now = new Date();
     $('goal-clock-date').textContent = clockFormatters.date.format(now);
     $('goal-clock-time').textContent = clockFormatters.time.format(now);

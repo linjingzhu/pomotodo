@@ -40,6 +40,8 @@ async function launch(t, ownsInstance = true) {
     setResizable(value) { this.resizable = value; }
     setBounds() {}
     setFullScreen() {}
+    close() { this.closeCalls = (this.closeCalls || 0) + 1; }
+    hide() { this.hidden = true; }
     show() {}
     focus() {}
   }
@@ -78,13 +80,25 @@ test('quit waits for the renderer and rejects an unrelated sender', async (t) =>
 
 test('a failed quit flush keeps the app open and can be retried', async (t) => {
   const h = await launch(t);
+  let prompts = 0;
+  h.electron.dialog.showMessageBox = async () => { prompts++; return { response: 0 }; };
   h.app.quit();
   h.ipcMain.emit('app:quitPrepared', { sender: h.win.webContents }, true);
+  await Promise.resolve();
+  assert.equal(prompts, 1);
   assert.equal(h.quits(), 0);
-  assert.equal(h.errors.length, 1);
   assert.equal(h.app.isQuitting, false);
   h.app.quit();
   h.ipcMain.emit('app:quitPrepared', { sender: h.win.webContents }, null);
+  assert.equal(h.quits(), 1);
+});
+
+test('a save that keeps failing can still quit without saving', async (t) => {
+  const h = await launch(t);
+  h.electron.dialog.showMessageBox = async (_win, options) => ({ response: options.buttons.indexOf('Quit Without Saving') });
+  h.app.quit();
+  h.ipcMain.emit('app:quitPrepared', { sender: h.win.webContents }, true);
+  for (let i = 0; i < 4; i++) await Promise.resolve();
   assert.equal(h.quits(), 1);
 });
 
@@ -114,13 +128,41 @@ test('unresponsive renderer offers a bounded quit recovery', async (t) => {
   assert.equal(h.quits(), 1);
 });
 
-test('close reports settings write failures instead of throwing', async (t) => {
+test('the close button closes through main, and only for its own window', async (t) => {
+  const h = await launch(t);
+  h.ipcMain.emit('window:close', { sender: {} });
+  assert.equal(h.win.closeCalls, undefined);
+  h.ipcMain.emit('window:close', { sender: h.win.webContents });
+  assert.equal(h.win.closeCalls, 1);
+});
+
+test('closing asks Quit / Hide to Tray / Cancel unless close-to-tray is on', async (t) => {
+  const h = await launch(t);
+  const asked = [];
+  h.electron.dialog.showMessageBox = async (_win, options) => { asked.push(options.buttons); return { response: 2 }; };
+  let prevented = false;
+  h.win.emit('close', { preventDefault() { prevented = true; } });
+  await Promise.resolve();
+  assert.equal(prevented, true);
+  assert.equal(JSON.stringify(asked), JSON.stringify([['Quit', 'Hide to Tray', 'Cancel']]));
+  assert.equal(h.win.hidden, undefined);
+  await h.handlers.get('window:setCloseToTray')({}, true);
+  h.win.emit('close', { preventDefault() {} });
+  assert.equal(asked.length, 1);
+  assert.equal(h.win.hidden, true);
+});
+
+test('a failed window-size save never blocks closing', async (t) => {
   const h = await launch(t);
   fs.mkdirSync(path.join(h.dir, 'settings.json.tmp'));
+  let asked = 0;
+  h.electron.dialog.showMessageBox = async () => { asked++; return { response: 2 }; };
+  assert.doesNotThrow(() => h.win.emit('close', { preventDefault() {} }));
+  assert.equal(asked, 1); // an interactive close still reaches the question
+  h.app.isQuitting = true;
   let prevented = false;
-  assert.doesNotThrow(() => h.win.emit('close', { preventDefault() { prevented = true; } }));
-  assert.equal(prevented, true);
-  assert.equal(h.errors.length, 1);
+  h.win.emit('close', { preventDefault() { prevented = true; } });
+  assert.equal(prevented, false); // a real quit goes through
 });
 
 test('clearing a background cancels an older pending pick', async (t) => {

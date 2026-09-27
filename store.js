@@ -212,7 +212,12 @@ function deleteGroup(file, id) {
 }
 
 function hasAnyRecords(file) {
-  const data = load(file);
+  let data;
+  try {
+    data = load(file, true);
+  } catch {
+    return true; // unreadable: keep Reset All Records available to replace it
+  }
   return data.sessions.length > 0 || data.goals.length > 0 || data.groups.length > 0;
 }
 

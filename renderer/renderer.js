@@ -496,7 +496,7 @@
   });
 
   el.closeBtn.addEventListener('click', () => {
-    window.close();
+    window.pomodoro.closeWindow();
   });
 
   function setPinButtonState(locked) {
@@ -736,7 +736,7 @@
       if (!isOpen()) return;
       list.classList.add('hidden');
       btn.setAttribute('aria-expanded', 'false');
-      btn.focus();
+      btn.focus({ preventScroll: true }); // a scroll-away close must not yank the panel back
     }
     function choose(i) {
       const li = items()[i];
@@ -759,10 +759,18 @@
     // "outside" and close the list out from under its own click handler.
     document.addEventListener('pointerdown', (e) => { if (isOpen() && !wrap.contains(e.target) && !list.contains(e.target)) close(); }, true);
     window.addEventListener('resize', () => { if (isOpen()) position(); });
-    // Fixed to the window, the list would stay put while its button
-    // scrolls away with the panel; close instead (but not when the list
-    // itself is being scrolled).
-    document.addEventListener('scroll', (e) => { if (isOpen() && !list.contains(e.target)) close(); }, true);
+    // The list is fixed to the window, so when whatever holds the button
+    // scrolls - including the scroll that clicking a half-hidden button
+    // causes as it takes focus - follow the button, and close only once it
+    // has scrolled out of view. The list's own scrolling, or any scroller
+    // that doesn't hold the button, is ignored.
+    document.addEventListener('scroll', (e) => {
+      if (!isOpen() || list.contains(e.target) || !(e.target === document || e.target.contains(btn))) return;
+      const area = e.target === document ? { top: 0, bottom: window.innerHeight } : e.target.getBoundingClientRect();
+      const b = btn.getBoundingClientRect();
+      if (b.bottom <= area.top || b.top >= area.bottom) close();
+      else position();
+    }, true);
     build();
     return { refresh: build };
   }

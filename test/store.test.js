@@ -134,3 +134,14 @@ test('a goal can be filed into a different group by id, or ungrouped', () => {
   assert.strictEqual(store.setGoalGroup(file, a.id, 'not-a-real-id'), null, 'an unknown group is rejected');
   assert.strictEqual(store.setGoalGroup(file, 'missing', work.id), null);
 });
+
+test('an unreadable records file keeps Reset All Records available', () => {
+  const file = tempFile();
+  fs.writeFileSync(file, '{"sessions": [');
+  assert.equal(store.hasAnyRecords(file), true);
+  assert.throws(() => store.addSession(file, { start: new Date().toISOString(), end: new Date().toISOString(), workedSec: 60 }));
+  store.resetAllRecords(file);
+  assert.equal(store.hasAnyRecords(file), false);
+  store.addSession(file, { start: new Date().toISOString(), end: new Date().toISOString(), workedSec: 60 });
+  assert.equal(store.hasAnyRecords(file), true);
+});
