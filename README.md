@@ -4,16 +4,18 @@
 
 ## 다운로드
 
-[Releases](https://github.com/linjingzhu/pomotodo/releases/latest)에서
+[소개 웹페이지](https://linjingzhu.github.io/pomotodo/)에서 기능 설명을 보거나,
+[Releases](https://github.com/linjingzhu/pomotodo/releases/latest)에서 바로
 `PomodoroTimer-Portable-<버전>.exe`(설치 없이 바로 실행하는 포터블 버전)를 받아
 원하는 폴더에 두고 실행하면 됩니다. 공개 저장소라 로그인 없이 누구나 받을 수
 있습니다.
 
 새 버전 배포: `package.json`의 `version`을 올려서 push하면 GitHub Actions
 (`.github/workflows/release.yml`)가 Windows 설치 파일을 빌드해 `v<버전>`
-Release로 올립니다. 버전은 0.x로 표기하며 빌드마다 x를 1씩 올리고, 정식
-릴리즈로 확정되면 1.0으로 올립니다 (앱 안 Settings 탭 맨 아래 About에 현재
-버전 표시). 공개 저장소에서는 일반 러너 기준으로 Actions가 무료이고,
+Release로 올립니다. 버전은 electron-builder가 요구하는 semver 형식을 맞추기
+위해 0.x.0으로 표기하며(예: 0.1.0), 빌드마다 x를 1씩 올리고, 정식 릴리즈로
+확정되면 1.0.0으로 올립니다 (앱 안 Settings 탭 맨 아래 About에 현재 버전
+표시). 공개 저장소에서는 일반 러너 기준으로 Actions가 무료이고,
 그 밖에도 비용이 들지 않도록 다음처럼 제한되어 있습니다.
 - 사용 시간이 1배로 계산되는 Linux 러너만 사용 (Windows 러너는 2배)
 - 이미 있는 버전이면 빌드를 건너뜀

@@ -757,6 +757,17 @@ commands → the compile and build ladder and every report; `generated` →
   (next builds: "0.2.0", etc., still jumping to "1.0.0" at the official
   release) - same policy, semver-legal form. No download link existed for
   v0.1 until this is released.
+- Added: a GitHub Pages landing site (feature overview + a download link
+  to the latest release) on an orphan `gh-pages` branch - `index.html`
+  plus `img/*.png` screenshots (timer/goals/calendar/settings) and the
+  new app icon, no build step. Chose classic "Deploy from a branch" Pages
+  over an Actions-based Pages workflow specifically to stay outside the
+  `.ai/REPOSITORY.md` "Paid automation" approval gate (that policy targets
+  hosted-runner automation; a branch-deploy Settings toggle uses zero
+  Actions minutes and isn't automation). Logged as OA-17 in
+  `docs/OWNER_ACTIONS.md`: the one remaining step (Settings → Pages →
+  Source: "Deploy from a branch" → `gh-pages` / `(root)`) needs the repo
+  owner, since no available tool can flip that toggle.
 
 ## Permanently excluded scope
 
