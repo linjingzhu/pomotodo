@@ -277,13 +277,15 @@ main {
   /* disc out to the track's outer edge at any size: r=52 + 1.5 in a 120 viewBox.
      The sector mask's two edges get a hairline angular blend instead of a
      hard stop - a true 0-width conic-gradient stop renders with a visibly
-     jagged/stair-stepped seam along the cut, not a clean antialiased line. */
+     jagged/stair-stepped seam along the cut, not a clean antialiased line.
+     The blend narrows to nothing where there's no cut (start at 0deg, end
+     at 360deg), or a full ring would show a faint notch at 12 o'clock. */
   mask-image:
     radial-gradient(circle closest-side, #000 89.17%, transparent calc(89.17% + 0.5px)),
     conic-gradient(
       transparent var(--ring-start),
-      #000 calc(var(--ring-start) + 0.75deg),
-      #000 calc(var(--ring-end) - 0.75deg),
+      #000 calc(var(--ring-start) + min(0.75deg, var(--ring-start))),
+      #000 calc(var(--ring-end) - min(0.75deg, 360deg - var(--ring-end))),
       transparent var(--ring-end)
     );
   mask-composite: intersect;
@@ -302,8 +304,8 @@ main {
     radial-gradient(circle closest-side, transparent calc(84.17% - 0.5px), #000 84.17%, #000 89.17%, transparent calc(89.17% + 0.5px)),
     conic-gradient(
       transparent var(--ring-start),
-      #000 calc(var(--ring-start) + 0.75deg),
-      #000 calc(var(--ring-end) - 0.75deg),
+      #000 calc(var(--ring-start) + min(0.75deg, var(--ring-start))),
+      #000 calc(var(--ring-end) - min(0.75deg, 360deg - var(--ring-end))),
       transparent var(--ring-end)
     );
 }
