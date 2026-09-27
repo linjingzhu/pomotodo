@@ -830,6 +830,27 @@ commands → the compile and build ladder and every report; `generated` →
 - Fixed: the "Permanently excluded scope" heading below had been dropped
   by an earlier log edit; restored.
 
+- Added: Settings > Background "Match window to image ratio" - Keep
+  width / Keep height resize the window so the widget (window minus
+  #app's 3px margins) has the background image's aspect ratio. The
+  renderer reads the image's natural size (any format Chromium decodes)
+  and main (fitAspect) keeps the named side, scales the whole result to
+  fit the display's work area and MIN_SIZE, keeps the top-left on
+  screen, and makes it the base size (panelGrowth set to 0, so an open
+  panel isn't grown on top of it and closing the panel doesn't shrink
+  it). Works pinned and from fullscreen, like Reset Size. Buttons are
+  disabled with no image. Also: #bg-image now overhangs the widget by 2x
+  the blur radius (was a fixed 40px) - the fixed overhang cropped ~30%
+  of an image even in a ratio-matched window; at blur 0 the image now
+  shows whole, at max blur (20) the overhang is the same 40px as before.
+  Verified against the real main.js under Xvfb: 1600x900 gives 1.777
+  from either button, panel-open keep-height clamps 1382 wide to
+  1024x579 (screen width) and survives closing/reopening the panel, a
+  1:2 image clamps to 515x1024, invalid input returns null, pinned
+  works, Clear disables the buttons, and the red frame of the test image
+  is fully visible at blur 0. Not verified: real Windows, multi-monitor
+  work areas, fullscreen path (no window manager under Xvfb).
+
 ## Permanently excluded scope
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer

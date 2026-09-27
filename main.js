@@ -572,6 +572,45 @@ function resetSize() {
 
 ipcMain.handle('window:resetSize', () => resetSize());
 
+// Settings > Background "Keep width" / "Keep height": resize so the widget
+// (the window minus #app's 3px margins) has the background image's aspect
+// ratio, keeping the named dimension. Scaled as a whole to stay within the
+// screen's work area and the minimum size (only an extreme ratio can't fit
+// both). Like Reset Size it works while pinned and from fullscreen, and
+// the result becomes the base size: an open panel isn't grown on top of it
+// and closing the panel doesn't shrink it.
+const APP_MARGIN = 6;
+function fitAspect(keep, imageWidth, imageHeight) {
+  if (!['width', 'height'].includes(keep)) return null;
+  if (!(imageWidth > 0 && imageHeight > 0 && Number.isFinite(imageWidth) && Number.isFinite(imageHeight))) return null;
+  const base = isFullscreen() ? fullscreenBounds : mainWindow.getBounds();
+  const area = screen.getDisplayMatching(base).workArea;
+  const ratio = imageWidth / imageHeight;
+  let aw = keep === 'width' ? base.width - APP_MARGIN : (base.height - APP_MARGIN) * ratio;
+  let ah = keep === 'width' ? (base.width - APP_MARGIN) / ratio : base.height - APP_MARGIN;
+  const down = Math.min(1, (area.width - APP_MARGIN) / aw, (area.height - APP_MARGIN) / ah);
+  aw *= down;
+  ah *= down;
+  const up = Math.max(1, (MIN_SIZE.width - APP_MARGIN) / aw, (MIN_SIZE.height - APP_MARGIN) / ah);
+  aw *= up;
+  ah *= up;
+  const width = Math.max(MIN_SIZE.width, Math.min(area.width, Math.round(aw + APP_MARGIN)));
+  const height = Math.max(MIN_SIZE.height, Math.min(area.height, Math.round(ah + APP_MARGIN)));
+  const x = Math.max(area.x, Math.min(base.x, area.x + area.width - width));
+  const y = Math.max(area.y, Math.min(base.y, area.y + area.height - height));
+  panelGrowth = panelOpen ? { dh: 0, dy: 0 } : null;
+  if (isFullscreen()) {
+    fullscreenBounds = { x, y, width, height };
+    exitFullscreen();
+  } else {
+    withResizeUnlocked(() => mainWindow.setBounds({ x, y, width, height }));
+  }
+  saveSettings({ windowWidth: width, windowHeight: height });
+  return { width, height };
+}
+
+ipcMain.handle('window:fitAspect', (_evt, { keep, width, height } = {}) => fitAspect(keep, Number(width), Number(height)));
+
 // One phase-end notification at a time: it stays up until the user
 // dismisses it, clicks it, or acts on the timer in the app.
 let phaseNotification = null;

@@ -34,6 +34,8 @@
     bgTint: document.getElementById('bg-tint'),
     bgPickBtn: document.getElementById('bg-pick-btn'),
     bgClearBtn: document.getElementById('bg-clear-btn'),
+    bgFitWidthBtn: document.getElementById('bg-fit-width-btn'),
+    bgFitHeightBtn: document.getElementById('bg-fit-height-btn'),
     bgBlur: document.getElementById('bg-blur'),
     bgTintColor: document.getElementById('bg-tint-color'),
     bgTintOpacity: document.getElementById('bg-tint-opacity'),
@@ -152,8 +154,12 @@
     document.documentElement.style.setProperty('--key', userAccentColor);
   }
 
+  // The image overhangs the widget by twice the blur radius, just enough
+  // to push blur's faded edge out of sight - and no more, so an unblurred
+  // image in a window matched to its ratio shows whole, uncropped.
   function applyBackgroundBlur(px) {
     el.bgImage.style.filter = `blur(${px}px)`;
+    el.bgImage.style.inset = `${-2 * px}px`;
   }
 
   function applyBackgroundTint(color, opacityPercent) {
@@ -161,8 +167,23 @@
     el.bgTint.style.opacity = String(opacityPercent / 100);
   }
 
+  // The image's own pixel size, for the "Match window to image ratio"
+  // buttons (null while there's no image, or it hasn't decoded yet).
+  let bgImageSize = null;
+  let bgImageToken = 0;
   function setBackgroundImage(dataUrl) {
     el.bgImage.style.backgroundImage = dataUrl ? `url(${dataUrl})` : 'none';
+    bgImageSize = null;
+    el.bgFitWidthBtn.disabled = el.bgFitHeightBtn.disabled = true;
+    const token = ++bgImageToken;
+    if (!dataUrl) return;
+    const img = new Image();
+    img.onload = () => {
+      if (token !== bgImageToken || !img.naturalWidth || !img.naturalHeight) return; // replaced meanwhile
+      bgImageSize = { width: img.naturalWidth, height: img.naturalHeight };
+      el.bgFitWidthBtn.disabled = el.bgFitHeightBtn.disabled = false;
+    };
+    img.src = dataUrl;
   }
 
   function currentDurationSec() {
@@ -513,6 +534,12 @@
     await window.pomodoro.clearBackgroundImage();
     setBackgroundImage(null);
   });
+
+  for (const [btn, keep] of [[el.bgFitWidthBtn, 'width'], [el.bgFitHeightBtn, 'height']]) {
+    btn.addEventListener('click', () => {
+      if (bgImageSize) window.pomodoro.fitAspect(keep, bgImageSize.width, bgImageSize.height);
+    });
+  }
 
   el.bgBlur.addEventListener('input', () => applyBackgroundBlur(Number(el.bgBlur.value)));
   el.bgBlur.addEventListener('change', () => {

@@ -52,7 +52,7 @@ html, body {
    but beneath its content. */
 #bg-image {
   position: absolute;
-  inset: -40px;
+  inset: 0; /* grown with the blur, see applyBackgroundBlur */
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
