@@ -779,6 +779,21 @@ commands → the compile and build ladder and every report; `generated` →
   (0.85 → 0.5 fill mode, solid → 0.55 stroke mode) so the whole disc reads
   as translucent, not just its faded far side. Verified via a headless
   Xvfb screenshot with a zoomed crop on the seam.
+- Fixed: the Goals tab's time zone dropdown showed badly clipped labels
+  ("KST (", "PT (L", ...) plus both a vertical and a horizontal scrollbar.
+  Root cause: makeDropdown's position() forced the list's width to match
+  its trigger button's width exactly - fine for Settings' Gauge
+  style/Monitor buttons (already wide enough for their own short options),
+  but the Goals tab's compact "Local ▾" button is far narrower than
+  labels like "KST (Seoul)". Fixed generally (not just for this one
+  dropdown): the list now measures its own natural (max-content) width
+  and widens to fit the longest option, never narrower than the button;
+  measured with max-height/overflow-y suspended so a soon-to-appear
+  vertical scrollbar's width isn't carved out of the very box being
+  measured (which was clipping rows by exactly the scrollbar's width even
+  after the main fix, until a SCROLLBAR_WIDTH probe compensated for it).
+  Verified via a headless Xvfb screenshot; re-checked the Settings tab's
+  two dropdowns for regressions (unaffected - already wide enough).
 
 ## Permanently excluded scope
 
