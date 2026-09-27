@@ -885,6 +885,21 @@ commands → the compile and build ladder and every report; `generated` →
   handshake, whether performance.now() advances across sleep, Windows 10
   support in Electron 44 / Chromium 152, lists over the rounded corners.
 
+- Changed: calendar heatmap, per the owner ("higher saturation = longer
+  work"). The 1.0.9 ramp kept chroma flat (<= 0.16) and raised lightness
+  (0.52 -> 0.86), so 4h+ read as the palest step. New ramp: chroma is a
+  share of the key's own (20/45/72/100%) and lightness steps DOWN 0.87 ->
+  0.665 - more work = more saturated, 4h+ = the key color itself. Lightness
+  had to fall, not rise: the key's full chroma only exists in sRGB near its
+  own lightness, and a lighter vivid top step was clipped for blue/purple
+  (measured: dL < 0.06, chroma no longer rising). All day numbers now take
+  dark ink. Measured from rendered pixels for eight key colors on a dark
+  backdrop: chroma rises every step, dataviz ordinal checks pass (one hue,
+  monotone L, dL >= 0.06, strongest step >= 4.8:1 vs panel), numbers >=
+  5:1. With a white desktop behind the panel the strongest step is
+  1.55-1.86:1 vs the (then gray) panel - below the 2:1 floor, but up from
+  1.04-1.15:1 for the old ramp.
+
 ## Permanently excluded scope
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer
