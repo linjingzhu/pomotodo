@@ -106,12 +106,10 @@
   let selectedDay = dayKey(today);
   let monthData = { sessions: [], goalsDone: [] };
 
+  // Level 0 is under an hour of focus that day (no color); each further
+  // hour is one darker step, capped at the 4th (4h or more).
   function level(sec) {
-    if (sec <= 0) return 0;
-    if (sec < 30 * 60) return 1;
-    if (sec < 90 * 60) return 2;
-    if (sec < 180 * 60) return 3;
-    return 4;
+    return Math.min(4, Math.floor(Math.max(0, sec) / 3600));
   }
 
   async function loadMonth() {
@@ -169,9 +167,24 @@
         className: 'session-meta',
         textContent: `${clock(s.start)}–${clock(s.end)} · ${duration(s.workedSec)}${s.completed ? '' : ' · stopped early'}`,
       });
-      return make('li', {}, [meta, note]);
+      const remove = make('button', { className: 'row-delete', textContent: '×', title: 'Delete this session' });
+      remove.setAttribute('aria-label', `Delete session, ${clock(s.start)}`);
+      remove.addEventListener('click', async () => {
+        await api.deleteSession(s.id);
+        loadMonth();
+      });
+      return make('li', {}, [make('div', { className: 'session-meta-row' }, [meta, remove]), note]);
     });
-    goals.forEach((g) => items.push(make('li', { className: 'goal-reached', textContent: `✓ Goal reached: ${g.title}` })));
+    goals.forEach((g) => {
+      const label = make('span', { className: 'goal-reached', textContent: `✓ Goal reached: ${g.title}` });
+      const remove = make('button', { className: 'row-delete', textContent: '×', title: 'Delete goal' });
+      remove.setAttribute('aria-label', `Delete goal: ${g.title}`);
+      remove.addEventListener('click', async () => {
+        await api.deleteGoal(g.id);
+        window.dispatchEvent(new Event('goals-changed')); // reloads this list too
+      });
+      items.push(make('li', { className: 'goal-reached-row' }, [label, remove]));
+    });
     $('cal-day-list').replaceChildren(...items);
     $('cal-day-empty').classList.toggle('hidden', items.length > 0);
   }

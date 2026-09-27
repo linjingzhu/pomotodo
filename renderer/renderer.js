@@ -340,7 +340,8 @@
   // Reset Session: the timer goes all the way back to a fresh, idle focus
   // period (like ↻, an in-progress focus session of a minute or more is
   // still recorded), and both totals return to 0.
-  el.statsResetBtn.addEventListener('click', () => {
+  el.statsResetBtn.addEventListener('click', async () => {
+    if (!(await window.pomodoro.confirmResetSession())) return;
     window.pomodoro.closeNotification();
     stopTick();
     if (mode === 'work') finishSession(false);
@@ -404,36 +405,17 @@
   }
 
   // Edge and corner handles resize the window (the window is transparent,
-  // so it has no native resize border). Pointer capture keeps the moves
-  // coming while the cursor is outside the window; at most one resize is
-  // sent per frame, and the last one always goes out.
+  // so it has no native resize border). Main does the actual tracking, by
+  // polling the cursor (see window:resizeStart in main.js) - not from this
+  // pointer's own coordinates, which is what keeps it correct across
+  // monitors at different DPI.
   document.querySelectorAll('#resize-handles > div').forEach((handle) => {
     handle.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
       handle.setPointerCapture(e.pointerId);
-      const { edge } = handle.dataset;
-      const startX = e.screenX;
-      const startY = e.screenY;
-      let pending = null;
-      let done = false;
-      const flush = () => {
-        if (pending) window.pomodoro.resizeMove(edge, pending.dx, pending.dy);
-        pending = null;
-      };
-      const move = (ev) => {
-        if (!pending) requestAnimationFrame(flush);
-        pending = { dx: ev.screenX - startX, dy: ev.screenY - startY };
-      };
-      const end = () => {
-        if (done) return;
-        done = true;
-        flush();
-        window.pomodoro.resizeEnd();
-        handle.removeEventListener('pointermove', move);
-      };
-      window.pomodoro.resizeStart();
-      handle.addEventListener('pointermove', move);
+      window.pomodoro.resizeStart(handle.dataset.edge);
+      const end = () => window.pomodoro.resizeEnd();
       handle.addEventListener('pointerup', end, { once: true });
       handle.addEventListener('lostpointercapture', end, { once: true });
     });
@@ -461,40 +443,30 @@
 
   // Dragging any other spot moves the window (there's no native drag
   // region; see #app in style.css). The move only starts past a few
-  // pixels, so a click or double-click never nudges the window, and the
-  // pointer is captured then so the drag keeps up outside the window.
-  // Main refuses it while fullscreen.
+  // pixels, so a click or double-click never nudges the window; this
+  // slop check is the only thing this pointermove listener is for - once
+  // past it, main does the actual tracking by polling the cursor itself
+  // (see window:moveStart in main.js), not from this pointer's own
+  // coordinates. The pointer is captured then so the slop-past state
+  // keeps up outside the window. Main refuses the move while fullscreen.
   const DRAG_SLOP_PX = 3;
   el.app.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || e.target.closest(INTERACTIVE)) return;
     const startX = e.screenX;
     const startY = e.screenY;
     let moving = false;
-    let pending = null;
-    const flush = () => {
-      if (pending) window.pomodoro.moveBy(pending.dx, pending.dy);
-      pending = null;
-    };
     const move = (ev) => {
-      const dx = ev.screenX - startX;
-      const dy = ev.screenY - startY;
-      if (!moving) {
-        if (Math.abs(dx) < DRAG_SLOP_PX && Math.abs(dy) < DRAG_SLOP_PX) return;
-        moving = true;
-        try { el.app.setPointerCapture(ev.pointerId); } catch (err) { /* released already */ }
-        window.pomodoro.moveStart();
-      }
-      if (!pending) requestAnimationFrame(flush);
-      pending = { dx, dy };
+      if (moving) return;
+      if (Math.abs(ev.screenX - startX) < DRAG_SLOP_PX && Math.abs(ev.screenY - startY) < DRAG_SLOP_PX) return;
+      moving = true;
+      try { el.app.setPointerCapture(ev.pointerId); } catch (err) { /* released already */ }
+      window.pomodoro.moveStart();
     };
     const end = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', end);
       window.removeEventListener('pointercancel', end);
-      if (moving) {
-        flush();
-        window.pomodoro.moveEnd();
-      }
+      if (moving) window.pomodoro.moveEnd();
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', end);

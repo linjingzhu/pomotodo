@@ -618,6 +618,31 @@ commands → the compile and build ladder and every report; `generated` →
   shown (`notify` resolves false). Trade-off: with Windows Do Not
   Disturb / Focus Assist on, the toast and its sound are both hidden,
   whereas the old chime always played.
+- 1.0.11, per user reports and requests:
+  - Window drag/resize now polls screen.getCursorScreenPoint() in main
+    (already relied on by trackPointer()) instead of trusting a renderer
+    mouse event's own screenX/screenY, which is the documented root
+    cause of Electron/Windows drag and resize drifting across monitors
+    at different DPI scale (screen coordinates are DIP-consistent;
+    per-event screenX is not guaranteed to be). Every move tick also
+    reasserts the exact size the window had when the drag began (wrapped
+    in withResizeUnlocked so the reassertion can win over any size the
+    OS already applied), which is the fix for "size keeps growing while
+    dragging a pinned window" - not reproducible on Linux (single
+    display, no real per-monitor DPI), so this is reasoned from the
+    documented mechanism, not observed directly; the existing regression
+    scripts (real X input) still pass unchanged. preload.js/renderer.js
+    no longer compute or send dx/dy at all; moveStart/resizeStart(edge)
+    and moveEnd/resizeEnd are the whole surface now.
+  - Calendar: the heatmap is now Math.min(4, floor(sec/3600)) - under 1h
+    is uncolored, then one step per further hour, capped at 4h+. Session
+    rows and "Goal reached" rows in the day view each got a × (row-delete
+    class, shared with the Goals tab's), calling the existing deleteGoal
+    or the new store.deleteSession/records:deleteSession. Deleting a
+    goal from Calendar removes it from Goals too (same store).
+  - Reset Session now confirms first via dialog.showMessageBox (Reset
+    Session / Cancel, Cancel is the default and Escape's target) -
+    verified by mocking showMessageBox for both answers.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

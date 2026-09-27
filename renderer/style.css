@@ -689,15 +689,18 @@ select:focus {
   font-size: 10px;
   white-space: nowrap;
 }
-.goal-delete {
+.goal-delete,
+.row-delete {
   width: 20px;
   height: 20px;
   padding: 0;
   font-size: 14px;
   line-height: 1;
   opacity: 0.6;
+  flex-shrink: 0;
 }
-.goal-delete:hover { opacity: 1; }
+.goal-delete:hover,
+.row-delete:hover { opacity: 1; }
 
 /* Calendar */
 #cal-header {
@@ -785,12 +788,17 @@ select:focus {
   flex-direction: column;
   gap: 3px;
 }
-.session-meta {
-  color: var(--text-muted);
-  font-size: 11px;
+.session-meta-row,
+.goal-reached-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.session-meta { color: var(--text-muted); font-size: 11px; }
+.session-meta-row .session-meta { flex: 1; min-width: 0; }
 .session-note { width: 100%; }
-.goal-reached { color: #40e0d0; }
+.goal-reached-row { padding: 2px 0; }
+.goal-reached { color: #40e0d0; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
 /* Thin, translucent scrollbar so the dark panel doesn't get a white bar. */
 .tab::-webkit-scrollbar { width: 6px; }

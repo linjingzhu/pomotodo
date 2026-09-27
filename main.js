@@ -295,61 +295,80 @@ ipcMain.on('window:progress', (_evt, { state, fraction, label } = {}) => {
   if (tray && typeof label === 'string') tray.setToolTip(label.slice(0, 120));
 });
 
-// Moving the window. The widget has no native drag region: on Windows a
-// drag region hides every mouse event from the page (double-clicks
-// included, which the fullscreen toggle needs), so the renderer drags the
-// window through here instead. dx/dy are the pointer's movement in screen
-// DIPs since the drag began. Refused while fullscreen (the window is
-// locked in place then).
-let moveFrom = null;
+// Moving and resizing the window. The widget has no native drag region or
+// resize border (a drag region hides every mouse event from the page on
+// Windows, double-clicks included; see the fullscreen toggle), so the
+// renderer's edge/corner handles and its drag-anywhere-else area both
+// drive the window from here, through a single poll timer.
+//
+// The poll reads the cursor via screen.getCursorScreenPoint() rather than
+// trusting dx/dy computed in the renderer from a mouse event's own
+// screenX/screenY: Electron's screen module reports the cursor in the
+// same DIP space as BrowserWindow bounds on every monitor, regardless of
+// that monitor's DPI scale (trackPointer() below relies on the same
+// guarantee), where a renderer mouse event does not consistently. Reading
+// it in main is what keeps a drag tracking 1:1 with the cursor across
+// monitors at different scale factors, instead of drifting.
+//
+// Every move tick also reasserts the exact size the window had when the
+// drag began (never just carrying over whatever size the OS currently
+// reports), wrapped in withResizeUnlocked so that reassertion can win even
+// if something already nudged the size - this is the fix for the window
+// growing while being dragged with the size locked.
+const RESIZE_EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+let dragPoll = null;
+let moveFrom = null; // { origin: [x, y], size: [w, h], cursor: {x, y} }
+let resizeFrom = null; // { bounds, edge, cursor: {x, y} }
+
+function stopDrag() {
+  if (dragPoll) {
+    clearInterval(dragPoll);
+    dragPoll = null;
+  }
+  moveFrom = null;
+  resizeFrom = null;
+}
 
 ipcMain.on('window:moveStart', () => {
-  moveFrom = isFullscreen() ? null : mainWindow.getPosition();
+  stopDrag();
+  if (isFullscreen()) return;
+  moveFrom = { origin: mainWindow.getPosition(), size: mainWindow.getSize(), cursor: screen.getCursorScreenPoint() };
+  dragPoll = setInterval(() => {
+    const cur = screen.getCursorScreenPoint();
+    const x = Math.round(moveFrom.origin[0] + (cur.x - moveFrom.cursor.x));
+    const y = Math.round(moveFrom.origin[1] + (cur.y - moveFrom.cursor.y));
+    withResizeUnlocked(() => mainWindow.setBounds({ x, y, width: moveFrom.size[0], height: moveFrom.size[1] }));
+  }, 16);
 });
 
-ipcMain.on('window:moveBy', (_evt, { dx, dy } = {}) => {
-  if (!moveFrom || isFullscreen() || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
-  mainWindow.setPosition(Math.round(moveFrom[0] + dx), Math.round(moveFrom[1] + dy));
+ipcMain.on('window:moveEnd', stopDrag);
+
+ipcMain.on('window:resizeStart', (_evt, { edge } = {}) => {
+  stopDrag();
+  if (isFullscreen() || loadSettings().sizeLocked || !RESIZE_EDGES.includes(edge)) return;
+  resizeFrom = { bounds: mainWindow.getBounds(), edge, cursor: screen.getCursorScreenPoint() };
+  dragPoll = setInterval(() => {
+    const cur = screen.getCursorScreenPoint();
+    const dx = cur.x - resizeFrom.cursor.x;
+    const dy = cur.y - resizeFrom.cursor.y;
+    const from = resizeFrom.bounds;
+    const { edge } = resizeFrom;
+    let width = from.width;
+    let height = from.height;
+    if (edge.includes('e')) width += dx;
+    if (edge.includes('w')) width -= dx;
+    if (edge.includes('s')) height += dy;
+    if (edge.includes('n')) height -= dy;
+    width = Math.max(MIN_SIZE.width, Math.round(width));
+    height = Math.max(MIN_SIZE.height, Math.round(height));
+    // Dragging the left or top edge keeps the opposite edge where it was.
+    const x = edge.includes('w') ? from.x + from.width - width : from.x;
+    const y = edge.includes('n') ? from.y + from.height - height : from.y;
+    withResizeUnlocked(() => mainWindow.setBounds({ x, y, width, height }));
+  }, 16);
 });
 
-ipcMain.on('window:moveEnd', () => {
-  moveFrom = null;
-});
-
-// Electron documents transparent windows as not resizable, and on Windows
-// they get no native resize border at all, so the renderer draws its own
-// edge and corner handles and drives the resize through here. dx/dy are the
-// pointer's movement in screen DIPs since the drag began; bounds are
-// recomputed from the start each time, so nothing drifts. Ignored while
-// the size is locked or fullscreen.
-const RESIZE_EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
-let resizeFrom = null;
-
-ipcMain.on('window:resizeStart', () => {
-  resizeFrom = isFullscreen() || loadSettings().sizeLocked ? null : mainWindow.getBounds();
-});
-
-ipcMain.on('window:resizeMove', (_evt, { edge, dx, dy } = {}) => {
-  if (!resizeFrom || isFullscreen() || !RESIZE_EDGES.includes(edge)) return;
-  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
-  const from = resizeFrom;
-  let width = from.width;
-  let height = from.height;
-  if (edge.includes('e')) width += dx;
-  if (edge.includes('w')) width -= dx;
-  if (edge.includes('s')) height += dy;
-  if (edge.includes('n')) height -= dy;
-  width = Math.max(MIN_SIZE.width, Math.round(width));
-  height = Math.max(MIN_SIZE.height, Math.round(height));
-  // Dragging the left or top edge keeps the opposite edge where it was.
-  const x = edge.includes('w') ? from.x + from.width - width : from.x;
-  const y = edge.includes('n') ? from.y + from.height - height : from.y;
-  withResizeUnlocked(() => mainWindow.setBounds({ x, y, width, height }));
-});
-
-ipcMain.on('window:resizeEnd', () => {
-  resizeFrom = null;
-});
+ipcMain.on('window:resizeEnd', stopDrag);
 
 // corner: 'tl' | 'tr' | 'bl' | 'br'
 ipcMain.handle('window:snapToCorner', (_evt, { displayId, corner }) => {
@@ -541,6 +560,21 @@ ipcMain.handle('notify', (_evt, { title, body }) => {
 
 ipcMain.handle('notify:close', () => closePhaseNotification());
 
+// Reset Session is destructive (it zeros both totals and can't be undone),
+// so it asks first, via the OS's own confirm dialog.
+ipcMain.handle('confirm:resetSession', async () => {
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    buttons: ['Reset Session', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Reset Session?',
+    message: 'Reset the timer and totals?',
+    detail: 'Total turns and total study time go back to 0, and the timer returns to an idle work period. This can\'t be undone.',
+  });
+  return result.response === 0;
+});
+
 // The background image is copied into the app's own folder (next to
 // settings.json) as background.<ext>, so moving or deleting the original
 // doesn't lose it. One copy at a time: picking another replaces it, and
@@ -624,6 +658,8 @@ const RECORDS_PATH = path.join(app.getPath('userData'), 'records.json');
 ipcMain.handle('records:addSession', (_evt, session) => store.addSession(RECORDS_PATH, session));
 
 ipcMain.handle('records:updateNote', (_evt, { id, note }) => store.updateSession(RECORDS_PATH, id, { note }));
+
+ipcMain.handle('records:deleteSession', (_evt, id) => !!store.deleteSession(RECORDS_PATH, id));
 
 ipcMain.handle('records:month', (_evt, month) => store.monthRecords(RECORDS_PATH, month));
 

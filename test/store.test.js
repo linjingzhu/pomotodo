@@ -20,6 +20,16 @@ test('sessions are saved, listed by local month, and noted', () => {
   assert.strictEqual(store.updateSession(file, 'missing', { note: 'x' }), null);
 });
 
+test('a session can be deleted', () => {
+  const file = tempFile();
+  const a = store.addSession(file, { start: '2026-09-26T01:00:00.000Z', end: '2026-09-26T01:25:00.000Z', workedSec: 1500, note: 'a', completed: true });
+  const b = store.addSession(file, { start: '2026-09-26T02:00:00.000Z', end: '2026-09-26T02:25:00.000Z', workedSec: 1500, note: 'b', completed: true });
+  assert.strictEqual(store.deleteSession(file, a.id).id, a.id);
+  const month = store.localDay(b.start).slice(0, 7);
+  assert.deepStrictEqual(store.monthRecords(file, month).sessions.map((s) => s.id), [b.id]);
+  assert.strictEqual(store.deleteSession(file, 'missing'), null);
+});
+
 test('goals: add, reach, un-reach, order, delete', () => {
   const file = tempFile();
   assert.strictEqual(store.addGoal(file, '   '), null);

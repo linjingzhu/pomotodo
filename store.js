@@ -61,6 +61,13 @@ function updateSession(file, id, patch) {
   });
 }
 
+function deleteSession(file, id) {
+  return update(file, (data) => {
+    const i = data.sessions.findIndex((s) => s.id === id);
+    return i === -1 ? null : data.sessions.splice(i, 1)[0];
+  });
+}
+
 // `month` is 'YYYY-MM' in local time.
 function monthRecords(file, month) {
   const data = load(file);
@@ -113,6 +120,7 @@ module.exports = {
   localDay,
   addSession,
   updateSession,
+  deleteSession,
   monthRecords,
   listGoals,
   addGoal,
