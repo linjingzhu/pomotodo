@@ -610,6 +610,14 @@ commands → the compile and build ladder and every report; `generated` →
     number stays orange only where readable.
   - `--text-muted` raised from #8b8d9c (3.9:1 on the panel) to #a9abb8
     (5.6:1).
+- 1.0.10: phase-end sound is the Windows alarm sound, played once, per
+  the user (they chose "once" over looping until dismissed). The toast XML
+  moved to `toast.js` (unit-tested): `<audio src="ms-winsoundevent:
+  Notification.Looping.Alarm" loop="false"/>` instead of silent. The
+  app's own chime plays only when notifications are off or no toast was
+  shown (`notify` resolves false). Trade-off: with Windows Do Not
+  Disturb / Focus Assist on, the toast and its sound are both hidden,
+  whereas the old chime always played.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

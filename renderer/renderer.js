@@ -184,7 +184,8 @@
 
   // A single short chime, synthesized on the fly (no bundled audio asset,
   // no autoplay-policy issues since it only ever fires after the user has
-  // already clicked Start).
+  // already clicked Start). Only the fallback for when no Windows
+  // notification (with its alarm sound) is shown.
   function playChime() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -238,10 +239,13 @@
     const title = mode === 'work' ? 'Break is over' : 'Focus time is over';
     let body = mode === 'work' ? 'Time to focus.' : mode === 'longBreak' ? 'Take a long break.' : 'Take a short break.';
     if (!autoStartsCurrentPhase()) body += ' Press Start when you\'re ready.';
+    // The Windows notification plays the Windows alarm sound; the app's own
+    // chime stands in when notifications are off or none could be shown.
     if (el.notifyOnPhaseChange.checked) {
-      window.pomodoro.notify(title, body);
+      window.pomodoro.notify(title, body).then((shown) => { if (!shown) playChime(); }, () => playChime());
+    } else {
+      playChime();
     }
-    playChime();
     playPhaseSweep();
   }
 

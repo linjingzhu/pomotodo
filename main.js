@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, screen, Menu, Tray, Notification, nativeIma
 const path = require('path');
 const fs = require('fs');
 const store = require('./store');
+const { phaseToastXml } = require('./toast');
 
 // ---- Settings persistence (simple JSON file, no external deps) ----
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
@@ -504,21 +505,6 @@ function resetSize() {
 
 ipcMain.handle('window:resetSize', () => resetSize());
 
-function escapeXml(text) {
-  return String(text).replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c]);
-}
-
-// Windows only keeps a toast on screen until the user acts on it in the
-// "reminder" scenario, and only when it has at least one button. Silent
-// because the renderer already plays its own chime.
-function persistentToastXml(title, body) {
-  return '<toast scenario="reminder">'
-    + `<visual><binding template="ToastGeneric"><text>${escapeXml(title)}</text><text>${escapeXml(body)}</text></binding></visual>`
-    + '<actions><action content="Dismiss" arguments="dismiss" activationType="system"/></actions>'
-    + '<audio silent="true"/>'
-    + '</toast>';
-}
-
 // One phase-end notification at a time: it stays up until the user
 // dismisses it, clicks it, or acts on the timer in the app.
 let phaseNotification = null;
@@ -529,15 +515,17 @@ function closePhaseNotification() {
   phaseNotification = null;
 }
 
+// Resolves true when a Windows toast (which carries the alarm sound) was
+// shown; otherwise the renderer plays its own chime instead.
 ipcMain.handle('notify', (_evt, { title, body }) => {
-  if (!Notification.isSupported()) return;
+  if (!Notification.isSupported()) return false;
   closePhaseNotification();
   const notification = new Notification({
     title,
     body,
-    silent: true,
+    silent: process.platform !== 'win32', // Windows: the toast plays the alarm sound
     timeoutType: 'never',
-    ...(process.platform === 'win32' ? { toastXml: persistentToastXml(title, body) } : {}),
+    ...(process.platform === 'win32' ? { toastXml: phaseToastXml(title, body) } : {}),
   });
   notification.on('click', () => {
     showWindow();
@@ -548,6 +536,7 @@ ipcMain.handle('notify', (_evt, { title, body }) => {
   });
   phaseNotification = notification;
   notification.show();
+  return process.platform === 'win32';
 });
 
 ipcMain.handle('notify:close', () => closePhaseNotification());
