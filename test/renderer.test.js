@@ -123,3 +123,14 @@ test('the close button asks main to close instead of calling window.close()', as
   app.emit('close-btn', 'click');
   assert.equal(closes, 1);
 });
+
+test('pausing right after an unnoticed sleep does not count the sleep gap', async () => {
+  const app = createRenderer();
+  await app.flush();
+  app.emit('start-pause-btn', 'click');
+  app.advance(40_000);
+  app.advance(300_000, 300_000, false); // asleep: no tick, no suspend notice
+  app.emit('start-pause-btn', 'click');
+  assert.equal(app.get('timer-display').textContent, '24:20');
+  assert.equal(app.get('app').dataset.state, 'paused');
+});
