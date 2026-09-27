@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, screen, Menu, Tray, Notification, nativeIma
 const path = require('path');
 const fs = require('fs');
 const store = require('./store');
+const { phaseToastXml } = require('./toast');
 
 // ---- Settings persistence (simple JSON file, no external deps) ----
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
@@ -24,6 +25,8 @@ const DEFAULT_SETTINGS = {
   backgroundTintOpacity: 0,
   accentColor: '#f2405a',
   gaugeStyle: 'pie',
+  panelSplit: 0.48, // the panel's share of #app's height, dragged via the splitter
+  clockTimeZone: '', // '' = the device's own zone; else an IANA name (Goals tab clock)
   currentTask: '',
   windowWidth: 340,
   windowHeight: 470,
@@ -251,6 +254,32 @@ function createTray() {
 
 ipcMain.handle('settings:get', () => loadSettings());
 
+ipcMain.handle('app:getVersion', () => app.getVersion());
+
+// The Data section's "Reset configuration": every Settings-tab value
+// (not the running totals, the current goal, the window's size/position,
+// or the records themselves - those have their own reset already) back
+// to its default, including dropping the stored background image copy.
+const CONFIG_KEYS = [
+  'workMinutes', 'breakMinutes', 'longBreakMinutes', 'longBreakEvery',
+  'autoStartBreaks', 'autoStartFocus', 'notifyOnPhaseChange',
+  'alwaysOnTop', 'minimizeToTray', 'closeToTray',
+  'backgroundBlur', 'backgroundTintColor', 'backgroundTintOpacity',
+  'accentColor', 'gaugeStyle', 'panelSplit',
+];
+ipcMain.handle('settings:resetConfig', () => {
+  removeStoredBackgrounds(null);
+  const defaults = {};
+  for (const key of CONFIG_KEYS) defaults[key] = DEFAULT_SETTINGS[key];
+  defaults.backgroundImageFile = null;
+  defaults.backgroundImagePath = null;
+  // alwaysOnTop is the one Settings value also mirrored live onto the
+  // window (see window:setAlwaysOnTop); writing the default to
+  // settings.json alone wouldn't un-set it if it was already on.
+  mainWindow.setAlwaysOnTop(defaults.alwaysOnTop);
+  return saveSettings(defaults);
+});
+
 ipcMain.handle('settings:save', (_evt, partial) => saveSettings(partial));
 
 ipcMain.handle('window:setAlwaysOnTop', (_evt, flag) => {
@@ -294,61 +323,80 @@ ipcMain.on('window:progress', (_evt, { state, fraction, label } = {}) => {
   if (tray && typeof label === 'string') tray.setToolTip(label.slice(0, 120));
 });
 
-// Moving the window. The widget has no native drag region: on Windows a
-// drag region hides every mouse event from the page (double-clicks
-// included, which the fullscreen toggle needs), so the renderer drags the
-// window through here instead. dx/dy are the pointer's movement in screen
-// DIPs since the drag began. Refused while fullscreen (the window is
-// locked in place then).
-let moveFrom = null;
+// Moving and resizing the window. The widget has no native drag region or
+// resize border (a drag region hides every mouse event from the page on
+// Windows, double-clicks included; see the fullscreen toggle), so the
+// renderer's edge/corner handles and its drag-anywhere-else area both
+// drive the window from here, through a single poll timer.
+//
+// The poll reads the cursor via screen.getCursorScreenPoint() rather than
+// trusting dx/dy computed in the renderer from a mouse event's own
+// screenX/screenY: Electron's screen module reports the cursor in the
+// same DIP space as BrowserWindow bounds on every monitor, regardless of
+// that monitor's DPI scale (trackPointer() below relies on the same
+// guarantee), where a renderer mouse event does not consistently. Reading
+// it in main is what keeps a drag tracking 1:1 with the cursor across
+// monitors at different scale factors, instead of drifting.
+//
+// Every move tick also reasserts the exact size the window had when the
+// drag began (never just carrying over whatever size the OS currently
+// reports), wrapped in withResizeUnlocked so that reassertion can win even
+// if something already nudged the size - this is the fix for the window
+// growing while being dragged with the size locked.
+const RESIZE_EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+let dragPoll = null;
+let moveFrom = null; // { origin: [x, y], size: [w, h], cursor: {x, y} }
+let resizeFrom = null; // { bounds, edge, cursor: {x, y} }
+
+function stopDrag() {
+  if (dragPoll) {
+    clearInterval(dragPoll);
+    dragPoll = null;
+  }
+  moveFrom = null;
+  resizeFrom = null;
+}
 
 ipcMain.on('window:moveStart', () => {
-  moveFrom = isFullscreen() ? null : mainWindow.getPosition();
+  stopDrag();
+  if (isFullscreen()) return;
+  moveFrom = { origin: mainWindow.getPosition(), size: mainWindow.getSize(), cursor: screen.getCursorScreenPoint() };
+  dragPoll = setInterval(() => {
+    const cur = screen.getCursorScreenPoint();
+    const x = Math.round(moveFrom.origin[0] + (cur.x - moveFrom.cursor.x));
+    const y = Math.round(moveFrom.origin[1] + (cur.y - moveFrom.cursor.y));
+    withResizeUnlocked(() => mainWindow.setBounds({ x, y, width: moveFrom.size[0], height: moveFrom.size[1] }));
+  }, 16);
 });
 
-ipcMain.on('window:moveBy', (_evt, { dx, dy } = {}) => {
-  if (!moveFrom || isFullscreen() || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
-  mainWindow.setPosition(Math.round(moveFrom[0] + dx), Math.round(moveFrom[1] + dy));
+ipcMain.on('window:moveEnd', stopDrag);
+
+ipcMain.on('window:resizeStart', (_evt, { edge } = {}) => {
+  stopDrag();
+  if (isFullscreen() || loadSettings().sizeLocked || !RESIZE_EDGES.includes(edge)) return;
+  resizeFrom = { bounds: mainWindow.getBounds(), edge, cursor: screen.getCursorScreenPoint() };
+  dragPoll = setInterval(() => {
+    const cur = screen.getCursorScreenPoint();
+    const dx = cur.x - resizeFrom.cursor.x;
+    const dy = cur.y - resizeFrom.cursor.y;
+    const from = resizeFrom.bounds;
+    const { edge } = resizeFrom;
+    let width = from.width;
+    let height = from.height;
+    if (edge.includes('e')) width += dx;
+    if (edge.includes('w')) width -= dx;
+    if (edge.includes('s')) height += dy;
+    if (edge.includes('n')) height -= dy;
+    width = Math.max(MIN_SIZE.width, Math.round(width));
+    height = Math.max(MIN_SIZE.height, Math.round(height));
+    // Dragging the left or top edge keeps the opposite edge where it was.
+    const x = edge.includes('w') ? from.x + from.width - width : from.x;
+    const y = edge.includes('n') ? from.y + from.height - height : from.y;
+    withResizeUnlocked(() => mainWindow.setBounds({ x, y, width, height }));
+  }, 16);
 });
 
-ipcMain.on('window:moveEnd', () => {
-  moveFrom = null;
-});
-
-// Electron documents transparent windows as not resizable, and on Windows
-// they get no native resize border at all, so the renderer draws its own
-// edge and corner handles and drives the resize through here. dx/dy are the
-// pointer's movement in screen DIPs since the drag began; bounds are
-// recomputed from the start each time, so nothing drifts. Ignored while
-// the size is locked or fullscreen.
-const RESIZE_EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
-let resizeFrom = null;
-
-ipcMain.on('window:resizeStart', () => {
-  resizeFrom = isFullscreen() || loadSettings().sizeLocked ? null : mainWindow.getBounds();
-});
-
-ipcMain.on('window:resizeMove', (_evt, { edge, dx, dy } = {}) => {
-  if (!resizeFrom || isFullscreen() || !RESIZE_EDGES.includes(edge)) return;
-  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
-  const from = resizeFrom;
-  let width = from.width;
-  let height = from.height;
-  if (edge.includes('e')) width += dx;
-  if (edge.includes('w')) width -= dx;
-  if (edge.includes('s')) height += dy;
-  if (edge.includes('n')) height -= dy;
-  width = Math.max(MIN_SIZE.width, Math.round(width));
-  height = Math.max(MIN_SIZE.height, Math.round(height));
-  // Dragging the left or top edge keeps the opposite edge where it was.
-  const x = edge.includes('w') ? from.x + from.width - width : from.x;
-  const y = edge.includes('n') ? from.y + from.height - height : from.y;
-  withResizeUnlocked(() => mainWindow.setBounds({ x, y, width, height }));
-});
-
-ipcMain.on('window:resizeEnd', () => {
-  resizeFrom = null;
-});
+ipcMain.on('window:resizeEnd', stopDrag);
 
 // corner: 'tl' | 'tr' | 'bl' | 'br'
 ipcMain.handle('window:snapToCorner', (_evt, { displayId, corner }) => {
@@ -504,21 +552,6 @@ function resetSize() {
 
 ipcMain.handle('window:resetSize', () => resetSize());
 
-function escapeXml(text) {
-  return String(text).replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c]);
-}
-
-// Windows only keeps a toast on screen until the user acts on it in the
-// "reminder" scenario, and only when it has at least one button. Silent
-// because the renderer already plays its own chime.
-function persistentToastXml(title, body) {
-  return '<toast scenario="reminder">'
-    + `<visual><binding template="ToastGeneric"><text>${escapeXml(title)}</text><text>${escapeXml(body)}</text></binding></visual>`
-    + '<actions><action content="Dismiss" arguments="dismiss" activationType="system"/></actions>'
-    + '<audio silent="true"/>'
-    + '</toast>';
-}
-
 // One phase-end notification at a time: it stays up until the user
 // dismisses it, clicks it, or acts on the timer in the app.
 let phaseNotification = null;
@@ -529,15 +562,17 @@ function closePhaseNotification() {
   phaseNotification = null;
 }
 
+// Resolves true when a Windows toast (which carries the alarm sound) was
+// shown; otherwise the renderer plays its own chime instead.
 ipcMain.handle('notify', (_evt, { title, body }) => {
-  if (!Notification.isSupported()) return;
+  if (!Notification.isSupported()) return false;
   closePhaseNotification();
   const notification = new Notification({
     title,
     body,
-    silent: true,
+    silent: process.platform !== 'win32', // Windows: the toast plays the alarm sound
     timeoutType: 'never',
-    ...(process.platform === 'win32' ? { toastXml: persistentToastXml(title, body) } : {}),
+    ...(process.platform === 'win32' ? { toastXml: phaseToastXml(title, body) } : {}),
   });
   notification.on('click', () => {
     showWindow();
@@ -548,9 +583,25 @@ ipcMain.handle('notify', (_evt, { title, body }) => {
   });
   phaseNotification = notification;
   notification.show();
+  return process.platform === 'win32';
 });
 
 ipcMain.handle('notify:close', () => closePhaseNotification());
+
+// Reset Session is destructive (it zeros both totals and can't be undone),
+// so it asks first, via the OS's own confirm dialog.
+ipcMain.handle('confirm:resetSession', async () => {
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    buttons: ['Reset Session', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Reset Session?',
+    message: 'Reset the timer and totals?',
+    detail: 'Total turns and total study time go back to 0, and the timer returns to an idle work period. This can\'t be undone.',
+  });
+  return result.response === 0;
+});
 
 // The background image is copied into the app's own folder (next to
 // settings.json) as background.<ext>, so moving or deleting the original
@@ -636,15 +687,54 @@ ipcMain.handle('records:addSession', (_evt, session) => store.addSession(RECORDS
 
 ipcMain.handle('records:updateNote', (_evt, { id, note }) => store.updateSession(RECORDS_PATH, id, { note }));
 
+ipcMain.handle('records:deleteSession', (_evt, id) => !!store.deleteSession(RECORDS_PATH, id));
+
+ipcMain.handle('records:hasAny', () => store.hasAnyRecords(RECORDS_PATH));
+
+// The Data section's "Reset all records": every session and goal, gone.
+// Asks first (separately from Reset Session's own confirm, different
+// wording since this is Goals/Calendar data, not the running totals).
+ipcMain.handle('confirm:resetAllRecords', async () => {
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    buttons: ['Delete All Records', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Delete all records?',
+    message: 'Delete every Goal and every Calendar session?',
+    detail: 'This removes all saved goals and focus-session history on this PC. It can\'t be undone.',
+  });
+  return result.response === 0;
+});
+
+ipcMain.handle('records:resetAll', () => {
+  store.resetAllRecords(RECORDS_PATH);
+  return true;
+});
+
 ipcMain.handle('records:month', (_evt, month) => store.monthRecords(RECORDS_PATH, month));
 
 ipcMain.handle('goals:list', () => store.listGoals(RECORDS_PATH));
 
-ipcMain.handle('goals:add', (_evt, title) => store.addGoal(RECORDS_PATH, title));
+ipcMain.handle('goals:add', (_evt, { title, groupId } = {}) => store.addGoal(RECORDS_PATH, title, groupId));
+
+ipcMain.handle('goals:rename', (_evt, { id, title }) => store.renameGoal(RECORDS_PATH, id, title));
 
 ipcMain.handle('goals:setDone', (_evt, { id, done }) => store.setGoalDone(RECORDS_PATH, id, done));
 
 ipcMain.handle('goals:delete', (_evt, id) => !!store.deleteGoal(RECORDS_PATH, id));
+
+ipcMain.handle('goals:reorder', (_evt, { id, beforeId }) => store.reorderGoal(RECORDS_PATH, id, beforeId));
+
+ipcMain.handle('goals:setGroup', (_evt, { id, groupId }) => store.setGoalGroup(RECORDS_PATH, id, groupId));
+
+ipcMain.handle('groups:list', () => store.listGroups(RECORDS_PATH));
+
+ipcMain.handle('groups:add', (_evt, name) => store.addGroup(RECORDS_PATH, name));
+
+ipcMain.handle('groups:rename', (_evt, { id, name }) => store.renameGroup(RECORDS_PATH, id, name));
+
+ipcMain.handle('groups:delete', (_evt, id) => !!store.deleteGroup(RECORDS_PATH, id));
 
 app.whenReady().then(() => {
   createWindow();

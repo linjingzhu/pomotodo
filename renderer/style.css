@@ -375,9 +375,11 @@ button {
 }
 button:hover { background: rgba(255, 255, 255, 0.24); }
 button:active { transform: scale(0.96); }
+button:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 
 #start-pause-btn,
-#reset-btn {
+#reset-btn,
+#skip-mode-btn {
   width: 58px;
   height: 58px;
   padding: 0;
@@ -385,7 +387,8 @@ button:active { transform: scale(0.96); }
   flex-shrink: 0;
 }
 #start-pause-btn svg,
-#reset-btn svg { fill: currentColor; }
+#reset-btn svg,
+#skip-mode-btn svg { fill: currentColor; }
 #start-pause-btn #pause-icon { display: none; }
 #start-pause-btn.running #play-icon { display: none; }
 #start-pause-btn.running #pause-icon { display: inline; }
@@ -407,13 +410,28 @@ button:active { transform: scale(0.96); }
   flex-direction: column;
   gap: 8px;
   overflow: hidden;
-  /* One fixed height for every tab, so switching tabs never moves the timer
-     above; short tabs leave space at the bottom, long ones scroll. */
-  flex: 0 0 48%;
+  /* The panel's share of #app's height, as a fraction so it holds across
+     window sizes; the splitter drags --panel-split, default 48%. */
+  flex: 0 0 var(--panel-split, 48%);
   min-height: 0;
   -webkit-app-region: no-drag;
 }
 #settings-panel.hidden { display: none; }
+
+/* Drags the main/panel split. A thin strip, only there (and only
+   hit-testable) while the panel is open - #app.panel-open is set
+   alongside #settings-panel.hidden being toggled off. */
+#panel-splitter {
+  flex: 0 0 auto;
+  height: 5px;
+  margin: -3px 0;
+  border-radius: 3px;
+  cursor: ns-resize;
+  display: none;
+  -webkit-app-region: no-drag;
+}
+#app.panel-open #panel-splitter { display: block; }
+#panel-splitter:hover, #panel-splitter.dragging { background: rgba(255, 255, 255, 0.18); }
 
 .button-group {
   display: flex;
@@ -432,6 +450,77 @@ button:active { transform: scale(0.96); }
   flex: 1;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
+
+/* Section headings in the Settings tab. */
+.group-title {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.group-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
+/* A dropdown, styled to match the rest of the glass UI - unlike a native
+   <select> popup, whose highlighted-row color follows the OS accent and
+   can't be restyled with CSS. The real <select> (same id, .hidden) stays
+   in the DOM for its value and change event; this is a view onto it. */
+.dropdown { position: relative; }
+.dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  max-width: 150px;
+}
+.dropdown-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.dropdown-caret { flex-shrink: 0; opacity: 0.7; transition: transform 0.15s ease; }
+.dropdown-btn[aria-expanded="true"] .dropdown-caret { transform: rotate(180deg); }
+.dropdown-list {
+  position: fixed;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: #26262e;
+  box-shadow: var(--glass-shadow-sm);
+}
+.dropdown-list li {
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dropdown-list li:hover,
+.dropdown-list li.highlighted { background: rgba(255, 255, 255, 0.1); }
+.dropdown-list li[aria-selected="true"] { color: var(--accent); font-weight: 600; }
+
+#about {
+  margin-top: 18px;
+  padding-top: 10px;
+  border-top: 1px solid var(--glass-border);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+#about p { margin: 2px 0; }
 
 input[type="number"] {
   width: 60px;
@@ -645,14 +734,57 @@ select:focus {
   padding: 0 10px 32px 0;
 }
 
-/* Goals */
-#goal-form {
+/* Goals: the live clock, header. Time zone row (a .row) is styled by the
+   shared .row rules; its dropdown reuses .dropdown from Settings. */
+#goal-clock { text-align: center; margin-bottom: 4px; }
+#goal-clock-date { font-size: 11px; color: var(--text-muted); }
+/* The time is the emphasized part, per the user - larger, bold, in the
+   key color, with seconds. */
+#goal-clock-time {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* One section per group, plus the ungrouped "Goals" section (not
+   editable - no rename/delete) and, when there are any, a trailing
+   "Reached" section for every done goal across all groups. */
+.goal-section { margin-bottom: 4px; }
+.goal-section-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+.goal-section-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+/* A header is also a drop target: dropping a goal here files it into
+   this group. */
+.goal-section-header.drop-target {
+  outline: 1px dashed var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.goal-add-form {
   display: flex;
   gap: 6px;
+  margin-bottom: 4px;
 }
-#goal-input { flex: 1; }
-#goal-add-btn { padding: 4px 12px; font-size: 12px; }
-#goal-list {
+.goal-add-input { flex: 1; }
+.goal-add-btn { padding: 4px 12px; font-size: 12px; }
+#add-group-btn { align-self: center; font-size: 12px; padding: 4px 12px; }
+
+.goal-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -660,12 +792,19 @@ select:focus {
   flex-direction: column;
   gap: 4px;
 }
-#goal-list li {
+.goal-list li {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 2px;
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
 }
+.goal-list li[draggable="true"] { cursor: grab; }
+/* The insertion line at the drop position; the dragged row itself dims
+   (its native drag ghost already follows the cursor). */
+.goal-list li.drop-before { border-top-color: var(--accent); }
+.goal-list li.drop-after { border-bottom-color: var(--accent); }
 .goal-title {
   flex: 1;
   min-width: 0;
@@ -676,11 +815,11 @@ select:focus {
 .goal-title:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
 .goal-title:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 /* The goal currently set on the timer. */
-#goal-list li.current .goal-title {
+.goal-list li.current .goal-title {
   color: var(--accent);
   font-weight: 600;
 }
-#goal-list li.done .goal-title {
+.goal-list li.done .goal-title {
   text-decoration: line-through;
   color: var(--text-muted);
 }
@@ -689,15 +828,21 @@ select:focus {
   font-size: 10px;
   white-space: nowrap;
 }
-.goal-delete {
+.goal-delete,
+.goal-rename,
+.row-delete {
   width: 20px;
   height: 20px;
   padding: 0;
   font-size: 14px;
   line-height: 1;
   opacity: 0.6;
+  flex-shrink: 0;
 }
-.goal-delete:hover { opacity: 1; }
+.goal-delete:hover,
+.goal-rename:hover,
+.row-delete:hover { opacity: 1; }
+.rename-input { width: 100%; font-size: inherit; }
 
 /* Calendar */
 #cal-header {
@@ -785,12 +930,17 @@ select:focus {
   flex-direction: column;
   gap: 3px;
 }
-.session-meta {
-  color: var(--text-muted);
-  font-size: 11px;
+.session-meta-row,
+.goal-reached-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.session-meta { color: var(--text-muted); font-size: 11px; }
+.session-meta-row .session-meta { flex: 1; min-width: 0; }
 .session-note { width: 100%; }
-.goal-reached { color: #40e0d0; }
+.goal-reached-row { padding: 2px 0; }
+.goal-reached { color: #40e0d0; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
 /* Thin, translucent scrollbar so the dark panel doesn't get a white bar. */
 .tab::-webkit-scrollbar { width: 6px; }

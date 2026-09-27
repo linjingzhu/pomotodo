@@ -610,6 +610,145 @@ commands → the compile and build ladder and every report; `generated` →
     number stays orange only where readable.
   - `--text-muted` raised from #8b8d9c (3.9:1 on the panel) to #a9abb8
     (5.6:1).
+- 1.0.10: phase-end sound is the Windows alarm sound, played once, per
+  the user (they chose "once" over looping until dismissed). The toast XML
+  moved to `toast.js` (unit-tested): `<audio src="ms-winsoundevent:
+  Notification.Looping.Alarm" loop="false"/>` instead of silent. The
+  app's own chime plays only when notifications are off or no toast was
+  shown (`notify` resolves false). Trade-off: with Windows Do Not
+  Disturb / Focus Assist on, the toast and its sound are both hidden,
+  whereas the old chime always played.
+- 1.0.11, per user reports and requests:
+  - Window drag/resize now polls screen.getCursorScreenPoint() in main
+    (already relied on by trackPointer()) instead of trusting a renderer
+    mouse event's own screenX/screenY, which is the documented root
+    cause of Electron/Windows drag and resize drifting across monitors
+    at different DPI scale (screen coordinates are DIP-consistent;
+    per-event screenX is not guaranteed to be). Every move tick also
+    reasserts the exact size the window had when the drag began (wrapped
+    in withResizeUnlocked so the reassertion can win over any size the
+    OS already applied), which is the fix for "size keeps growing while
+    dragging a pinned window" - not reproducible on Linux (single
+    display, no real per-monitor DPI), so this is reasoned from the
+    documented mechanism, not observed directly; the existing regression
+    scripts (real X input) still pass unchanged. preload.js/renderer.js
+    no longer compute or send dx/dy at all; moveStart/resizeStart(edge)
+    and moveEnd/resizeEnd are the whole surface now.
+  - Calendar: the heatmap is now Math.min(4, floor(sec/3600)) - under 1h
+    is uncolored, then one step per further hour, capped at 4h+. Session
+    rows and "Goal reached" rows in the day view each got a × (row-delete
+    class, shared with the Goals tab's), calling the existing deleteGoal
+    or the new store.deleteSession/records:deleteSession. Deleting a
+    goal from Calendar removes it from Goals too (same store).
+  - Reset Session now confirms first via dialog.showMessageBox (Reset
+    Session / Cancel, Cancel is the default and Escape's target) -
+    verified by mocking showMessageBox for both answers.
+- Settings tab overhaul, per the user, same release as 1.0.11's fixes
+  (still on the same branch/PR at the time of writing):
+  - Grouped under titled sections (Timer/Window/Display/Background/
+    Appearance/Data), .group-title headings replacing the old <hr>s.
+  - Monitor and Gauge style are now a custom dropdown (makeDropdown() in
+    renderer.js): a native <select> popup's highlighted-row color follows
+    the OS accent and isn't restylable with CSS (a longstanding Chromium
+    limitation) - confirmed by screenshot, the selected row was OS blue
+    against this app's pink/red key color. The real <select> stays in the
+    DOM (class "hidden") for its value and change event, so every
+    existing listener on it is unchanged; the dropdown is only a view,
+    rebuilt from its current <option>s on open (so Monitor's dynamic list
+    stays live) and after any programmatic value/option change (a
+    `.refresh()` call at each such site).
+  - A draggable splitter (#panel-splitter, between main and
+    #settings-panel) sets --panel-split, the panel's share of #app's
+    height as a percentage (persisted as `panelSplit`, default 0.48 -
+    matching the old fixed 48%), clamped in pixels (both sides keep at
+    least ~90-100px) so it scales sanely across window sizes.
+  - Data section: "Reset All Records" (store.hasAnyRecords/
+    resetAllRecords; disabled with nothing to lose; confirms via a
+    second native dialog, separate wording from Reset Session's) and
+    "Reset Configuration" (settings:resetConfig - every CONFIG_KEYS
+    value back to DEFAULT_SETTINGS, drops the stored background image
+    copy, and - since alwaysOnTop is the one setting also mirrored live
+    onto the window - calls mainWindow.setAlwaysOnTop(false) directly,
+    since writing settings.json alone wouldn't un-set it. No confirm, by
+    the user's own spec: reversible by hand, unlike deleting records).
+    Both call the same applyConfigToUI(settings), extracted from init().
+  - About footer: "Designed by Lim Jeongsu" and the version
+    (app:getVersion -> Electron's app.getVersion(), which reads
+    package.json correctly only when launched as the real app (`electron
+    .`/packaged) - confirmed 0.1 that way; invoking main.js from an
+    external script, as most of this project's own throwaway test
+    harnesses do, makes Electron report its own version instead. Not a
+    product bug; the harness invocation is the anomaly.)
+  - Versioning scheme changed at the user's request: 0.x from here on,
+    x +1 each build, jumping to 1.0 only once declared the official
+    release. This build is 0.1 (package.json), a deliberate "downgrade"
+    in the number - confirmed harmless: release.yml only checks whether
+    a `v<version>` tag/release already exists, never compares ordering.
+  - Lesson (costly mid-session): `git checkout -- main.js`, meant to
+    discard one throwaway debug line added on top of substantial
+    uncommitted feature work, discarded the whole file back to HEAD -
+    silently dropping panelSplit/app:getVersion/resetConfig/hasAnyRecords/
+    resetAllRecords until an E2E rerun surfaced "no handler registered"
+    and the loss was diagnosed and every handler re-applied. `git
+    checkout`/`restore` on a file mid-feature is never the right way to
+    undo a small addition - edit it back out instead, or stash first.
+- App icon replaced again, per the user: they uploaded a new
+  `pomodoro_timer_icon.svg` (a circular timer-dial design, progress arc,
+  centered "25") directly to `stable` via GitHub's web upload, ahead of
+  where this branch's PR was based - merged stable in first, then moved
+  the file over `assets/pomodoro-app-icon.svg` (the path `npm run icons`
+  reads) and deleted the root-level upload, then re-ran the script.
+  Regenerated: build/icon.ico, renderer/icon.png, renderer/tray-icon.png,
+  renderer/tray-icon@2x.png. Checked visually at 256px and 32px (tray).
+- A third control button, per the user: manually switches work<->break
+  (#skip-mode-btn, after Reset). Deliberately NOT switchMode() reused
+  wholesale: that function's totalTurns++/finishSession(true) treats the
+  work phase as genuinely completed, which a manual early skip is not,
+  so skipping a work phase instead calls finishSession(false) (records
+  "stopped early" only past 60s, matching Reset's own semantics) with no
+  turn credited and no long-break-cycle progress; it always lands on the
+  short break, and either break always returns to work. No chime/
+  notification (an explicit user action, not an unattended completion).
+  Verified: idle toggle, a <60s skip (nothing recorded), a 61s skip
+  (recorded stopped-early, turns unchanged).
+- Goals tab overhaul, per the user ("Goal 개선"): a live clock, goal
+  groups, drag-and-drop reordering/filing, and per-item rename.
+  - Clock: date/weekday + HH:MM:SS (Intl.DateTimeFormat via
+    toLocaleDateString/toLocaleTimeString, so DST/zone data comes from
+    the bundled ICU, not hand-rolled offset math), a curated 10-zone
+    picker (Local/UTC/KST/JST/PT/ET/GMT/CET/IST/AEST) reusing
+    makeDropdown() from renderer.js (exposed as window.makeDropdown,
+    since panel.js loads after it in the same page - no module system
+    here). Persisted as settings.clockTimeZone. Ticks only while the
+    Goals tab is the active tab AND the panel is open (startClock/
+    stopClock from showTab()/panel-toggled).
+  - Groups: store.js gained a `groups` array (id/name/createdAt) and
+    goals gained `groupId` (null = ungrouped). listGoals() dropped
+    createdAt-based sorting for OPEN goals in favor of array position
+    being the manual order (addGoal now unshifts, so "newest first"
+    still holds until something is dragged); done goals are unaffected,
+    still sorted by doneAt desc, and not draggable (a history, not a
+    working set) - a deliberate scope cut from the request, which didn't
+    address done items specifically.
+  - Drag-and-drop uses the native HTML5 DnD API (draggable="true" +
+    dragstart/dragover/drop/dragend), not a custom pointer-driven one:
+    it gives the cursor-following ghost image for free (exactly what was
+    asked), and a thin border shows the drop line (before/after the
+    hovered row). Dropping on a group's header (or a differently-grouped
+    row) files the goal there via the new store.setGoalGroup, then
+    store.reorderGoal places it - added because, once goals can be
+    grouped, having no way to move one between groups after creation
+    would be a dead end; not explicitly requested, a natural extension
+    of the ask. Verified with synthetic DragEvent + a real DataTransfer
+    dispatched at the DOM (not xdotool - intra-page HTML5 DnD is a JS
+    protocol; this exercises the actual listeners end to end).
+  - Rename: an inline <input> swapped in for the title/name span on
+    click (Enter commits via renameGoal/renameGroup, Escape cancels,
+    blur commits like Enter) - same pattern for both goals and groups.
+  - "+ New Group" toggles into an inline input the same way, Enter-only
+    (blank or Escape cancels, no group is created).
+  - hasAnyRecords/resetAllRecords (Settings > Data) now also cover
+    groups.
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope

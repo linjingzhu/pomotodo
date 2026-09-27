@@ -41,6 +41,14 @@
             <path d="M2.3 2.5 L2.8 6.2 L6.2 5.2 Z" />
           </svg>
         </button>
+        <button id="skip-mode-btn" title="Switch to Break">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <path d="M2.5 5.3h9.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            <path d="M9.3 2.6 L13 5.3 L9.3 8 Z" />
+            <path d="M13.5 10.7h-9.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            <path d="M6.7 13.4 L3 10.7 L6.7 8 Z" />
+          </svg>
+        </button>
       </div>
       <div id="goal-field">
         <button id="goal-check" role="checkbox" aria-checked="false" aria-label="Goal reached" title="Mark this goal as reached">
@@ -60,6 +68,12 @@
       </div>
     </main>
 
+    <!-- Drags the boundary between main and the panel, changing how much of
+         #app's height each gets (a fraction, so it holds across window
+         sizes). Only present - and only hit-testable - while the panel is
+         open; see #app.panel-open in style.css. -->
+    <div id="panel-splitter" title="Drag to resize"></div>
+
     <section id="settings-panel" class="hidden">
       <nav id="panel-tabs" role="tablist">
         <button role="tab" id="tab-btn-goals" data-tab="goals" aria-selected="true">Goals</button>
@@ -68,12 +82,25 @@
       </nav>
 
       <div id="tab-goals" class="tab" role="tabpanel" aria-labelledby="tab-btn-goals">
-        <form id="goal-form">
-          <input id="goal-input" type="text" maxlength="200" placeholder="Add a goal" />
-          <button type="submit" id="goal-add-btn">Add</button>
-        </form>
-        <p id="goals-empty" class="hint">Set a goal, then tick it off when you reach it. Reached goals also appear on that day in the Calendar tab.</p>
-        <ul id="goal-list"></ul>
+        <div id="goal-clock">
+          <div id="goal-clock-date"></div>
+          <div id="goal-clock-time"></div>
+        </div>
+        <div class="row">
+          <label id="goal-clock-tz-label">Time zone</label>
+          <div class="dropdown" id="goal-clock-tz-dropdown">
+            <button type="button" class="dropdown-btn" id="goal-clock-tz-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="goal-clock-tz-label goal-clock-tz-btn">
+              <span class="dropdown-label"></span>
+              <svg class="dropdown-caret" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </button>
+            <ul class="dropdown-list hidden" role="listbox" tabindex="-1" aria-labelledby="goal-clock-tz-label"></ul>
+          </div>
+          <select id="goal-clock-tz" class="hidden" aria-hidden="true" tabindex="-1"></select>
+        </div>
+
+        <p id="goals-empty" class="hint">Set a goal, then tick it off when you reach it. Reached goals also appear on that day in the Calendar tab. Drag a goal to reorder it, and drag it onto a group's title to file it there.</p>
+        <div id="goal-sections"></div>
+        <button type="button" id="add-group-btn">+ New Group</button>
       </div>
 
       <div id="tab-calendar" class="tab hidden" role="tabpanel" aria-labelledby="tab-btn-calendar">
@@ -85,11 +112,11 @@
         <div id="cal-grid"></div>
         <div id="cal-legend" aria-label="Focus time per day, from less to more">
           <span>Less</span>
-          <i class="cal-swatch level-0" title="No focus"></i>
-          <i class="cal-swatch level-1" title="Under 30m"></i>
-          <i class="cal-swatch level-2" title="30m to 1h 30m"></i>
-          <i class="cal-swatch level-3" title="1h 30m to 3h"></i>
-          <i class="cal-swatch level-4" title="3h or more"></i>
+          <i class="cal-swatch level-0" title="Under 1h"></i>
+          <i class="cal-swatch level-1" title="1h to 2h"></i>
+          <i class="cal-swatch level-2" title="2h to 3h"></i>
+          <i class="cal-swatch level-3" title="3h to 4h"></i>
+          <i class="cal-swatch level-4" title="4h or more"></i>
           <span>More</span>
         </div>
         <div id="cal-day">
@@ -100,6 +127,7 @@
       </div>
 
       <div id="tab-settings" class="tab hidden" role="tabpanel" aria-labelledby="tab-btn-settings">
+      <h3 class="group-title">Timer</h3>
       <div class="row">
         <label for="work-min">Work (min)</label>
         <input type="number" id="work-min" min="1" max="180" value="25" />
@@ -128,6 +156,8 @@
         <label for="notify-on-phase-change">Windows notification when a session ends</label>
         <input type="checkbox" id="notify-on-phase-change" />
       </div>
+
+      <h3 class="group-title">Window</h3>
       <div class="row">
         <label for="always-top">Always on top</label>
         <input type="checkbox" id="always-top" />
@@ -140,10 +170,18 @@
         <label for="close-to-tray">Close to tray (keeps running)</label>
         <input type="checkbox" id="close-to-tray" />
       </div>
-      <hr />
+
+      <h3 class="group-title">Display</h3>
       <div class="row">
-        <label for="display-select">Monitor</label>
-        <select id="display-select"></select>
+        <label id="display-select-label">Monitor</label>
+        <div class="dropdown" id="display-select-dropdown">
+          <button type="button" class="dropdown-btn" id="display-select-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="display-select-label display-select-btn">
+            <span class="dropdown-label"></span>
+            <svg class="dropdown-caret" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </button>
+          <ul class="dropdown-list hidden" role="listbox" tabindex="-1" aria-labelledby="display-select-label"></ul>
+        </div>
+        <select id="display-select" class="hidden" aria-hidden="true" tabindex="-1"></select>
       </div>
       <div class="row">
         <label>Snap to corner</label>
@@ -154,7 +192,8 @@
           <button data-corner="br" title="Bottom right">↘</button>
         </div>
       </div>
-      <hr />
+
+      <h3 class="group-title">Background</h3>
       <div class="row">
         <label>Background image (fills the short side)</label>
         <div class="button-group">
@@ -174,18 +213,42 @@
         <label for="bg-tint-opacity">Tint strength</label>
         <input type="range" id="bg-tint-opacity" min="0" max="100" step="5" />
       </div>
-      <hr />
+
+      <h3 class="group-title">Appearance</h3>
       <div class="row">
         <label for="accent-color">Key color (work; break is always turquoise)</label>
         <input type="color" id="accent-color" />
       </div>
       <div class="row">
-        <label for="gauge-style">Gauge style</label>
-        <select id="gauge-style">
+        <label id="gauge-style-label">Gauge style</label>
+        <div class="dropdown" id="gauge-style-dropdown">
+          <button type="button" class="dropdown-btn" id="gauge-style-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="gauge-style-label gauge-style-btn">
+            <span class="dropdown-label"></span>
+            <svg class="dropdown-caret" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </button>
+          <ul class="dropdown-list hidden" role="listbox" tabindex="-1" aria-labelledby="gauge-style-label"></ul>
+        </div>
+        <select id="gauge-style" class="hidden" aria-hidden="true" tabindex="-1">
           <option value="pie">Filled pie</option>
           <option value="stroke">Stroke</option>
         </select>
       </div>
+
+      <h3 class="group-title">Data</h3>
+      <p class="hint">Goals and Calendar session history are saved on this PC only.</p>
+      <div class="row">
+        <label>Delete every goal and session</label>
+        <button id="reset-records-btn" title="Delete all Goals and Calendar data">Reset All Records</button>
+      </div>
+      <div class="row">
+        <label>Every setting above, back to default</label>
+        <button id="reset-config-btn" title="Reset every Settings option to its default">Reset Configuration</button>
+      </div>
+
+      <footer id="about">
+        <p>Designed by Lim Jeongsu</p>
+        <p id="about-version"></p>
+      </footer>
       </div>
     </section>
   </div>
