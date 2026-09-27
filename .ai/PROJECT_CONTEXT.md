@@ -900,6 +900,20 @@ commands → the compile and build ladder and every report; `generated` →
   1.55-1.86:1 vs the (then gray) panel - below the 2:1 floor, but up from
   1.04-1.15:1 for the old ramp.
 
+- Added: five gauge styles from the owner's chosen concept page (Time
+  disk, Glow ring, Tick dial, Minute beads, Liquid), selectable in
+  Settings > Gauge style beside Filled pie and Stroke. Drawn on one
+  <canvas> (#ring-canvas, overhanging the ring by 12px so glows aren't
+  clipped) from the same state the CSS styles use; the CSS pie/stroke
+  and the SVG track are hidden while a canvas style is active
+  (data-gauge-kind). The 600ms refill-from-12 sweep is reproduced with an
+  ease-out. Only Liquid animates between ticks (a ripple while running,
+  ~20 fps, none with prefers-reduced-motion); every other style redraws
+  from render(). Minute beads reads focusInCycle/longBreakEvery for its
+  cycle dots. Verified in the real app under Xvfb: all 7 styles in
+  idle/running/paused/break, the refill sweep on Tick dial, Liquid 23
+  draws/s running and 0 paused, Tick dial 0 draws/s paused.
+
 ## Permanently excluded scope
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer
