@@ -794,8 +794,20 @@ commands → the compile and build ladder and every report; `generated` →
   after the main fix, until a SCROLLBAR_WIDTH probe compensated for it).
   Verified via a headless Xvfb screenshot; re-checked the Settings tab's
   two dropdowns for regressions (unaffected - already wide enough).
-
-## Permanently excluded scope
+- Added: the in-app close (X) button now asks before acting, instead of
+  silently quitting (when "Close to tray" is off, the default) with no
+  warning at all. A native confirm dialog (same style as the existing
+  Reset Session/Reset All Records confirms) offers Quit, Hide to Tray, or
+  Cancel. "Close to tray (keeps running)" in Settings is unchanged - when
+  it's on, close still hides immediately without asking, since that's an
+  explicit standing choice. Verified end-to-end under Xvfb + xdotool:
+  clicking close blocks on the dialog (the app doesn't quit or hide on
+  its own), and pressing Enter (the default "Quit" button) does trigger a
+  real app.quit() (before-quit/will-quit both fired). The Cancel path
+  couldn't be reliably automated here (no window manager under Xvfb to
+  give the modal dialog reliable keyboard focus for Escape), but the
+  branch is a direct no-op read of the same response value already
+  proven correct for Quit.
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer
   is the only committed target for now.
