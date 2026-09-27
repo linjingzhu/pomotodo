@@ -750,6 +750,13 @@ commands → the compile and build ladder and every report; `generated` →
   - hasAnyRecords/resetAllRecords (Settings > Data) now also cover
     groups.
 - Next: nothing queued; ask before adding more.
+- Fixed: the v0.1 release build (run #13) failed in 1s at the
+  electron-builder step with `Invalid version: "0.1"` - electron-builder
+  requires a strict x.y.z semver, and the new "0.x, +1 per build" scheme
+  had set package.json's version to the bare "0.1". Changed to "0.1.0"
+  (next builds: "0.2.0", etc., still jumping to "1.0.0" at the official
+  release) - same policy, semver-legal form. No download link existed for
+  v0.1 until this is released.
 
 ## Permanently excluded scope
 
