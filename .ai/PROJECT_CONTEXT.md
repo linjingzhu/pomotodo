@@ -768,6 +768,17 @@ commands → the compile and build ladder and every report; `generated` →
   `docs/OWNER_ACTIONS.md`: the one remaining step (Settings → Pages →
   Source: "Deploy from a branch" → `gh-pages` / `(root)`) needs the repo
   owner, since no available tool can flip that toggle.
+- Fixed: the progress ring's pie-cut edge showed a jagged/stair-stepped
+  diagonal line, and the fill looked opaque near the moving edge instead
+  of translucent throughout. Root cause: the mask's sector conic-gradient
+  used true 0-width hard stops (transparent directly to #000 at the same
+  angle) - conic-gradient hard stops render without antialiasing, so the
+  cut line came out jagged instead of a clean radial edge. Fix: a 0.75deg
+  angular blend at each mask edge (still visually a hard cut, but now
+  antialiased) plus lower alpha on the fill gradient's near-opaque end
+  (0.85 → 0.5 fill mode, solid → 0.55 stroke mode) so the whole disc reads
+  as translucent, not just its faded far side. Verified via a headless
+  Xvfb screenshot with a zoomed crop on the seam.
 
 ## Permanently excluded scope
 
