@@ -692,6 +692,14 @@ commands → the compile and build ladder and every report; `generated` →
     and the loss was diagnosed and every handler re-applied. `git
     checkout`/`restore` on a file mid-feature is never the right way to
     undo a small addition - edit it back out instead, or stash first.
+- App icon replaced again, per the user: they uploaded a new
+  `pomodoro_timer_icon.svg` (a circular timer-dial design, progress arc,
+  centered "25") directly to `stable` via GitHub's web upload, ahead of
+  where this branch's PR was based - merged stable in first, then moved
+  the file over `assets/pomodoro-app-icon.svg` (the path `npm run icons`
+  reads) and deleted the root-level upload, then re-ran the script.
+  Regenerated: build/icon.ico, renderer/icon.png, renderer/tray-icon.png,
+  renderer/tray-icon@2x.png. Checked visually at 256px and 32px (tray).
 - Next: nothing queued; ask before adding more.
 
 ## Permanently excluded scope
