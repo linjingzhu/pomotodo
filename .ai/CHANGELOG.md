@@ -40,6 +40,147 @@ for wording, examples and ordering that change nothing about what is required.
 
 ---
 
+## 3.4.1 — 2026-09-27
+
+Ran the first upgrade against a repository that had adopted the set, and its
+two test suites reported two dozen failures while every check passed. Nothing
+was broken: the suites adopt *from* the tree they run in, so inside an adopter
+they copy that repository's filled-in context into a scratch directory and then
+report on it. The same failures were there before the upgrade, at 3.2.0.
+
+- `.ai/tools/README.md` now says which of the three commands runs where:
+  `check_policy_set.py` is the guard an adopter runs and it passes there; the
+  two suites are the set's own development tools and belong where
+  `LESSONS_FROM_PRACTICE.md` is. The file had listed all three as if they were
+  interchangeable, which is how an adopter reads two dozen failures as
+  breakage;
+- recorded the matching blind spot: the checks answer whether the set works in
+  an adopting repository, the suites answer whether the *checks* work, and
+  nothing yet verifies an adopted tree's tooling from inside that tree.
+
+Wording only — no rule changed, and no behaviour. It is here because the next
+thing this release does is copy those instructions into forty repositories.
+
+---
+
+## 3.4.0 — 2026-09-27
+
+Asked to propagate a release to the 41 repositories that have adopted this set,
+and found the set had no way to do it. `adopt.py` starts a repository; nothing
+moved an existing one forward. The obvious substitute — run adoption again —
+destroys something every time.
+
+- **`adopt.py --upgrade --into <repo>`** refreshes the policy documents and the
+  tools in a repository that already has them, and hands back everything that
+  repository owns: `.ai/PROJECT_CONTEXT.md`, `.ai/memory/PROJECT_LESSONS.md`,
+  `.ai/ROADMAP.md`, `.ai/reports/**`, and `.ai/tools/portability-denylist.txt`;
+- **the denylist is why the mode exists.** Adoption copies `.ai/` wholesale and
+  the set ships its own denylist, so a second run over a lived-in repository
+  replaces that project's names with this set's seeds. Its portability check
+  then keeps passing while proving nothing about the repository it runs in —
+  the failure the seeds' own comment warns about, arriving by the one path
+  nobody had tried. Reproduced first: the test that asserts the loss runs
+  before the one that asserts the fix, so the mode cannot quietly stop
+  preventing it;
+- it refuses a tree that never adopted the set, because adoption needs the
+  project's facts and inventing eleven of them per repository is the failure
+  this set exists to prevent; it refuses the set's own home; and it refuses to
+  be combined with `--from-template`, which is a different job;
+- it prints the version it moved from and to, and ends by running the checks in
+  the upgraded tree. Over dozens of repositories that line is the only way to
+  see which ones actually moved;
+- **capabilities are not replaced.** One the repository already has stays,
+  because it may be theirs — the promise adoption already made. But one whose
+  content differs from the set's is now reported `[stale]`, because silence
+  there meant an improved agent definition never reached an adopter and nobody
+  could see it. `--refresh-capabilities` replaces them and loses local changes,
+  which is why it is not the default;
+- eight tests, including the reproduction above and both refusals.
+
+The gap this fills was invisible from inside the set's own repository: every
+check here passes whether or not adopters can be moved forward, because nothing
+here is an adopter. It took being asked to update 41 of them.
+
+---
+
+## 3.3.0 — 2026-09-26
+
+Read a multi-agent operating system someone else had written for their own
+repository, and took the six rules this set did not already have. Most of that
+document was already here in different words; where the two disagreed, the set
+kept its own, and the disagreements are listed at the end.
+
+The largest gap was the one a self-improving set is least able to see in
+itself.
+
+- **`EVOLUTION.md` § *What a run may change on its own*** — three levels,
+  decided by what a change lets *later* runs do. **Record** (project memory,
+  the playbook, the roadmap, reports) a run may edit on its own; **Rule** (the
+  policy documents and the checks) needs the user to ask or approve; and
+  **Direction** — what the product is and is not, and the list `CORE.md` §
+  *Autonomy* says to ask about, including the table itself — is never a run's
+  to change. The size of the edit does not decide the level: one sentence
+  turning a MEDIUM review into a LOW is a Rule change. A set that improves
+  itself can lower its own gates, and a run under pressure has every reason
+  to;
+- **`EVOLUTION.md` § *Activity is not a result*** — agent count, tool calls,
+  investigation, tokens spent and report length measure effort. The measure
+  that is an outcome is **cost per accepted change**. A strategy that halves
+  the agent count and doubles the rework made the number that matters worse,
+  and so did one that bought efficiency with a regression;
+- **`EXECUTION.md` § *The size was a hypothesis*** — the size was judged when
+  the least was known, so work outgrowing it is normal and continuing at the
+  old size is the defect. A Worker whose Pack turns out larger returns
+  `FOUND / WRONG / RISK / NEEDS` and stops, rather than widening its own
+  ownership; the Mission Packet template now carries that as a
+  `RETURN INSTEAD IF` contract beside `DONE WHEN`. S → M → L is an outcome,
+  not a failed estimate;
+- **`REPOSITORY.md` § *The local base branch is a mirror*** — it tracks the
+  remote and holds nothing of its own, so syncing it is only ever
+  `--ff-only`, and a sync that cannot fast-forward stops and reports instead
+  of resolving itself. A plain `git pull` there writes a merge commit
+  recording a divergence nobody intended, on the branch every other branch is
+  cut from, and it looks deliberate afterwards. This run reached exactly that
+  situation on `stable` and was stopped before the pull ran;
+- **`REPOSITORY.md` § *Deleting a branch*** — the four conditions, and `-d`
+  as the check rather than the convenience: it refuses a branch whose commits
+  are not in the history it is being deleted from. **Automation never uses
+  `-D`**, which deletes precisely the branch the check would have saved and
+  says nothing;
+- **`EXECUTION.md`**, two smaller ones: each worktree builds into its own
+  directory, because two sharing one overwrite each other's artefacts and the
+  failure reads as a source defect in whichever built second — a compiler
+  cache may still be shared, being keyed by content; and a Manager session is
+  replaced at a **task boundary**, never on a clock, into the same branch and
+  worktree.
+
+`REPOSITORY.md` goes to 1.2.0, and that one bump covers two rule additions:
+3.2.0 added § *Paid automation* to it without moving the version, which the
+checks do not catch — `.ai/tools/README.md` § *What they do not answer* already
+records that a bump's correctness is a judgement. Recorded rather than
+back-dated.
+
+**No new check.** None of the six can be read from structure: nothing in a
+file says who approved an edit, whether a size was re-judged, or which command
+a run reached for. They are stated in their owning documents and that is all
+the enforcement there is — `.ai/tools/README.md` § *What they do not answer*
+is where that kind of limit belongs, and this is a large addition to it.
+
+These rules were not paid for by a defect in this repository, so none of them
+becomes a `LESSONS_FROM_PRACTICE.md` entry. They are adopted because the gap
+was real, not because this project proved it.
+
+Its role-to-model table needed nothing: 3.2.0 had already added
+`HARNESS.md` § *Codex capabilities and model routing*, which maps the same
+three tiers the document names. The Claude agent definitions still pin no
+model, and a reviewer's is still decided against the implementer's
+(`REVIEW.md` § *Cross-agent independence*).
+
+Deliberately not taken: a second document layout for `.ai/`;
+`Easy / Normal / Difficult` beside the existing `S / M / L`; a per-Worker
+child-branch hierarchy, where one write owner per path already prevents the
+conflict more cheaply; and a separate git-only agent role, whose forbidden list
+is `REPOSITORY.md` and `CORE.md` § *Autonomy* already.
 ## 3.2.0 — 2026-09-25
 
 Add a low-cost Dispatcher before the Primary Manager.
