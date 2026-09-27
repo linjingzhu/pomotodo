@@ -570,6 +570,15 @@
     const btn = wrap.querySelector('.dropdown-btn');
     const label = wrap.querySelector('.dropdown-label');
     const list = wrap.querySelector('.dropdown-list');
+    // Moved to <body>: #app and #settings-panel both use backdrop-filter,
+    // which (like filter) makes an element the containing block for its
+    // fixed-position descendants - so a list left inside them isn't
+    // actually fixed to the window at all, it's "fixed" to that filtered
+    // ancestor's own box (and clipped by its overflow:hidden besides),
+    // landing the open list at some corner unrelated to the button. <body>
+    // has no such property, so position: fixed on the list means what it
+    // looks like it means.
+    document.body.appendChild(list);
     let highlighted = -1;
     const items = () => Array.from(list.children);
     const isOpen = () => !list.classList.contains('hidden');
@@ -665,8 +674,15 @@
       const li = e.target.closest('li');
       if (li) choose(items().indexOf(li));
     });
-    document.addEventListener('pointerdown', (e) => { if (isOpen() && !wrap.contains(e.target)) close(); }, true);
+    // list is no longer a descendant of wrap (see above), so a click
+    // inside it must be checked for separately or it would count as
+    // "outside" and close the list out from under its own click handler.
+    document.addEventListener('pointerdown', (e) => { if (isOpen() && !wrap.contains(e.target) && !list.contains(e.target)) close(); }, true);
     window.addEventListener('resize', () => { if (isOpen()) position(); });
+    // Fixed to the window, the list would stay put while its button
+    // scrolls away with the panel; close instead (but not when the list
+    // itself is being scrolled).
+    document.addEventListener('scroll', (e) => { if (isOpen() && !list.contains(e.target)) close(); }, true);
     build();
     return { refresh: build };
   }

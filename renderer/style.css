@@ -243,8 +243,9 @@ main {
 /* Progress pie: a conic gradient masked to a disc (the track circle's
    outer edge) and to the remaining sector, so the whole inside of the
    circle fills. The moving edge (the current moment) is the key color;
-   toward the fixed 12 o'clock edge it drifts to a neighbouring hue and
-   fades. Slightly translucent so the digits on top stay readable. Angles are registered properties so the
+   toward the fixed 12 o'clock edge it drifts to a neighbouring hue. Fully
+   opaque; the digits' text-shadow keeps them readable. Angles are
+   registered properties so the
    depletion still animates smoothly. The glow sits on the parent because a
    filter on the masked element itself would be masked away. */
 @property --ring-start {
@@ -270,8 +271,8 @@ main {
   inset: 0;
   background: conic-gradient(
     from var(--ring-start),
-    oklch(from var(--accent) l c h / 0.5) 0deg,
-    oklch(from var(--accent) l c calc(h + 45) / 0.22) calc(var(--ring-end) - var(--ring-start))
+    oklch(from var(--accent) l c h) 0deg,
+    oklch(from var(--accent) l c calc(h + 45)) calc(var(--ring-end) - var(--ring-start))
   );
   /* disc out to the track's outer edge at any size: r=52 + 1.5 in a 120 viewBox.
      The sector mask's two edges get a hairline angular blend instead of a
@@ -290,12 +291,12 @@ main {
 }
 
 /* Settings > Gauge style: Stroke draws the same gradient on the ring band
-   only, a touch more solid at the moving end since no digits sit on it. */
+   only. */
 #app[data-gauge="stroke"] #ring-fill {
   background: conic-gradient(
     from var(--ring-start),
-    oklch(from var(--accent) l c h / 0.55) 0deg,
-    oklch(from var(--accent) l c calc(h + 45) / 0.3) calc(var(--ring-end) - var(--ring-start))
+    oklch(from var(--accent) l c h) 0deg,
+    oklch(from var(--accent) l c calc(h + 45)) calc(var(--ring-end) - var(--ring-start))
   );
   mask-image:
     radial-gradient(circle closest-side, transparent calc(84.17% - 0.5px), #000 84.17%, #000 89.17%, transparent calc(89.17% + 0.5px)),
@@ -514,6 +515,9 @@ button:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
   background: #26262e;
   box-shadow: var(--glass-shadow-sm);
 }
+/* Focused on open only to take arrow keys; the highlighted row already
+   shows where the keyboard is, so the browser's focus ring is noise. */
+.dropdown-list:focus { outline: none; }
 .dropdown-list li {
   padding: 6px 10px;
   border-radius: 7px;
