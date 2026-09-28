@@ -46,6 +46,14 @@ def run_checker_in(root: Path) -> tuple[int, str]:
     return result.returncode, result.stdout + result.stderr
 
 
+def upgrade(target: Path, *extra: str) -> tuple[int, str]:
+    result = subprocess.run(
+        [sys.executable, str(ADOPT), "--upgrade", "--into", str(target), *extra],
+        capture_output=True, text=True, check=False,
+    )
+    return result.returncode, result.stdout + result.stderr
+
+
 def adopt(target: Path, facts: dict[str, str] | None = None, *extra: str) -> tuple[int, str]:
     argv = [sys.executable, str(ADOPT), "--into", str(target), *extra]
     for key, value in (facts or {}).items():
@@ -210,6 +218,86 @@ class AdoptTests(unittest.TestCase):
                     {path.name: path.read_bytes() for path in workflows.iterdir()},
                     existing,
                 )
+
+    # -- upgrading a repository that already adopted the set ---------------
+    def test_re_running_adoption_destroys_the_adopters_denylist(self) -> None:
+        """The defect --upgrade exists for, asserted before the fix is used.
+
+        Plain adoption copies `.ai/` wholesale, and the set ships its own
+        denylist. Re-running it over a lived-in tree replaces that repository's
+        product names with the set's seeds, and its portability check goes on
+        passing while proving nothing.
+        """
+        adopt(self.target, FACTS)
+        denylist = self.target / ".ai" / "tools" / "portability-denylist.txt"
+        denylist.write_text("Widget\nWidgetCorp\n", encoding="utf-8")
+        adopt(self.target, FACTS)
+        self.assertNotIn("Widget", denylist.read_text(encoding="utf-8"))
+
+    def test_upgrade_keeps_what_the_repository_owns(self) -> None:
+        adopt(self.target, FACTS)
+        denylist = self.target / ".ai" / "tools" / "portability-denylist.txt"
+        lessons = self.target / ".ai" / "memory" / "PROJECT_LESSONS.md"
+        roadmap = self.target / ".ai" / "ROADMAP.md"
+        denylist.write_text("Widget\nWidgetCorp\n", encoding="utf-8")
+        roadmap.write_text("# Roadmap\n\n## Widget importer\n", encoding="utf-8")
+        lessons.write_text(lessons.read_text(encoding="utf-8") + "\n## Widget parser\n", encoding="utf-8")
+        context = self.context()
+
+        code, out = upgrade(self.target)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(denylist.read_text(encoding="utf-8"), "Widget\nWidgetCorp\n")
+        self.assertIn("Widget importer", roadmap.read_text(encoding="utf-8"))
+        self.assertIn("Widget parser", lessons.read_text(encoding="utf-8"))
+        self.assertEqual(self.context(), context)
+
+    def test_upgrade_updates_the_policy_documents(self) -> None:
+        # The other half: keeping the repository's files is only useful if the
+        # set's own documents actually move.
+        adopt(self.target, FACTS)
+        core = self.target / ".ai" / "CORE.md"
+        core.write_text("---\ndoc_id: ai-core\nversion: 0.0.1\n"
+                        "canonical_path: .ai/CORE.md\nupdated: 2020-01-01\n---\n\n# Stale\n",
+                        encoding="utf-8")
+        upgrade(self.target)
+        self.assertEqual(
+            core.read_text(encoding="utf-8"),
+            (ROOT / ".ai" / "CORE.md").read_text(encoding="utf-8"),
+        )
+
+    def test_upgrade_reports_the_version_it_moved(self) -> None:
+        adopt(self.target, FACTS)
+        _, out = upgrade(self.target)
+        self.assertIn("[upgrade]", out)
+
+    def test_upgrade_leaves_a_diverged_capability_alone_and_says_so(self) -> None:
+        adopt(self.target, FACTS)
+        agent = self.target / ".claude" / "agents" / "fast-explorer.md"
+        mine = "---\nname: fast-explorer\ndescription: mine\n---\n\nMine.\n"
+        agent.write_text(mine, encoding="utf-8")
+        _, out = upgrade(self.target)
+        self.assertEqual(agent.read_text(encoding="utf-8"), mine)
+        self.assertIn("[stale]", out)
+
+    def test_refresh_capabilities_replaces_a_diverged_one(self) -> None:
+        adopt(self.target, FACTS)
+        agent = self.target / ".claude" / "agents" / "fast-explorer.md"
+        agent.write_text("---\nname: fast-explorer\ndescription: mine\n---\n", encoding="utf-8")
+        upgrade(self.target, "--refresh-capabilities")
+        self.assertEqual(
+            agent.read_text(encoding="utf-8"),
+            (ROOT / ".claude" / "agents" / "fast-explorer.md").read_text(encoding="utf-8"),
+        )
+
+    def test_upgrade_refuses_a_tree_that_never_adopted(self) -> None:
+        code, out = upgrade(self.target)
+        self.assertNotEqual(code, 0)
+        self.assertIn("has not adopted the set", out)
+
+    def test_upgrade_refuses_the_sets_own_home(self) -> None:
+        code, out = upgrade(ROOT)
+        self.assertNotEqual(code, 0)
+        self.assertIn("not the set itself", out)
 
     # -- the instance files ------------------------------------------------
     def test_template_instructions_do_not_survive(self) -> None:

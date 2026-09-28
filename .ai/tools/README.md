@@ -1,6 +1,6 @@
 ---
 doc_id: ai-tools
-version: 2.0.0
+version: 2.2.1
 canonical_path: .ai/tools/README.md
 updated: 2026-09-25
 ---
@@ -14,8 +14,17 @@ python3 .ai/tools/check_policy_set.py        # the checks
 python3 .ai/tools/test_check_policy_set.py   # prove each one fails on purpose
 python3 .ai/tools/adopt.py --into <repo>     # start a repository from this set
 python3 .ai/tools/adopt.py --from-template   # finish a "Use this template" repo
+python3 .ai/tools/adopt.py --upgrade --into <repo>   # move an adopter to this version
 python3 .ai/tools/test_adopt.py              # prove an adopted repo starts green
 ```
+
+**Only the first of those runs everywhere.** `check_policy_set.py` is the guard
+an adopting repository runs, and it passes there. The two test suites are the
+set's own development tools: they break a copy of the tree on purpose and
+adopt *from* it, so in a repository that adopted the set they adopt that
+repository's filled-in context into a scratch directory and report failures
+about it. Two dozen failures there mean the suites are in the wrong tree, not
+that the set is broken. Run them where `LESSONS_FROM_PRACTICE.md` is.
 
 Python 3.11 or newer, standard library only, no dependencies, no configuration
 beyond the denylist. Native Codex agent definitions are parsed with `tomllib`.
@@ -60,6 +69,18 @@ evidence only for the question its check actually asked — `.ai/CORE.md` §
 - **Whether a skill is invoked when it should be.** Nothing structural can see
   that. A skill that must not start on its own says so in its own text, and
   whether a run honoured it is visible only in what the run did.
+- **Whether the set works in the repository that adopted it.** The checks
+  answer that; the test suites answer whether the *checks* work, and only at
+  the set's home (§ *Tools* above). Nothing currently verifies an adopted
+  tree's tooling from inside that tree.
+- **Whether a run stayed inside what it was allowed to change.** No file
+  records who approved an edit, so `.ai/EVOLUTION.md` §
+  *What a run may change on its own* is enforced by the report and the diff a
+  person reads, not here. The same holds for the rest of that class: whether a
+  size was re-judged when the work outgrew it, whether a Worker returned
+  instead of widening its ownership, and which git command a run reached for.
+  These are the largest unchecked area in the set, and they are unchecked
+  because structure cannot see intent.
 
 Guards here read structure — front matter, headings, references, paths — rather
 than prose, per `LESSONS_FROM_PRACTICE.md` entry 14: a check that greps
@@ -128,6 +149,39 @@ the set's own home, and the checks would start reading the adopter's `README.md`
 as if it were this one's. Adoption does not install GitHub Actions workflows
 or alter workflows already in the target repository. An existing instance file
 is kept, not overwritten, unless `--force` says otherwise.
+
+## Upgrading a repository that already adopted the set
+
+`--upgrade --into <repo>` refreshes the policy documents and the tools in a
+repository that already has them, and hands back everything that repository
+owns:
+
+```text
+.ai/tools/portability-denylist.txt
+.ai/PROJECT_CONTEXT.md
+.ai/memory/PROJECT_LESSONS.md
+.ai/ROADMAP.md
+.ai/reports/**
+```
+
+The dangerous one is the **denylist**, and it is why this mode exists. Plain
+adoption copies `.ai/` wholesale and the set ships its own denylist, so running
+it a second time over a lived-in repository replaces that project's names with
+this set's seeds. The portability check then goes on passing while proving
+nothing about the repository it is running in — which is exactly what the
+seeds' own comment warns about. A test asserts that defect before the fix, so
+the mode cannot quietly stop preventing it.
+
+It prints the version it moved from and to, refuses a tree that never adopted
+the set (adoption needs the project's facts, and inventing them is the failure
+this set exists to prevent), refuses the set's own home, and ends by running
+the checks in the upgraded tree.
+
+**Capabilities are not replaced.** An agent definition or skill the repository
+already has stays, because it may be theirs — but one whose content differs
+from the set's is reported as `[stale]`, since the repository will go on
+running the older definition. `--refresh-capabilities` replaces them and says
+so; it loses local changes to those files, which is why it is not the default.
 
 ## GitHub's "Use this template"
 

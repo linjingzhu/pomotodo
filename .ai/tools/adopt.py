@@ -70,6 +70,22 @@ TEMPLATES = {
     ".ai/memory/PROJECT_LESSONS.template.md": ".ai/memory/PROJECT_LESSONS.md",
 }
 
+# What an adopting repository owns, and an upgrade must hand back untouched.
+#
+# The dangerous one is the denylist. The set ships it with its own seed names,
+# so copying `.ai/` over an adopted tree replaces the adopter's product names
+# with another project's — and their portability check goes on passing while
+# proving nothing, which is precisely what that file's own comment warns
+# about. The others are listed because the set shipping a file at one of these
+# paths later would silently start overwriting them.
+PRESERVED = (
+    ".ai/tools/portability-denylist.txt",
+    ".ai/PROJECT_CONTEXT.md",
+    ".ai/memory/PROJECT_LESSONS.md",
+    ".ai/ROADMAP.md",
+)
+PRESERVED_DIRS = (".ai/reports/",)
+
 KEY_LINE = re.compile(r"^([a-z_]+):\s*(.*)$")
 PLACEHOLDER = re.compile(r"<[^>]+>")
 
@@ -253,6 +269,67 @@ def copy_capabilities(target: Path) -> tuple[list[str], list[str]]:
     return written, kept
 
 
+def set_version(root: Path) -> str:
+    """The newest release the changelog at `root` records, or `unknown`."""
+    changelog = root / ".ai" / "CHANGELOG.md"
+    if not changelog.exists():
+        return "unknown"
+    for line in changelog.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## ") and line[3:4].isdigit():
+            return line[3:].split("—")[0].strip()
+    return "unknown"
+
+
+def stale_capabilities(target: Path, kept: list[str]) -> list[str]:
+    """Of the capabilities left in place, the ones whose content is not the
+    set's. An identical copy is not worth a line; a different one is, because
+    the repository will go on running the older definition."""
+    return [
+        name for name in kept
+        if (SET_ROOT / name).is_file()
+        and (target / name).read_bytes() != (SET_ROOT / name).read_bytes()
+    ]
+
+
+def upgrade(target: Path, refresh_capabilities: bool = False) -> tuple[list[str], list[str], str, str]:
+    """Refresh the set in a repository that already adopted it.
+
+    Adoption and upgrade differ in one thing that matters: an upgrade runs
+    against a tree that has been lived in. Everything in `PRESERVED` is read
+    before the copy and written back after, so the copy cannot quietly take
+    the repository's own facts with it.
+
+    Returns (written capabilities, kept capabilities, version before, after).
+    """
+    if not (target / ".ai" / "CORE.md").exists():
+        raise SystemExit(
+            f"{target} has not adopted the set — there is nothing to upgrade.\n"
+            "Run without --upgrade to adopt it, which needs the project's facts."
+        )
+
+    held = {
+        name: (target / name).read_bytes()
+        for name in PRESERVED
+        if (target / name).is_file()
+    }
+    before = set_version(target)
+
+    copy_set(target)
+    written, kept = copy_capabilities(target)
+
+    if refresh_capabilities:
+        for name in kept:
+            source = SET_ROOT / name
+            if source.is_file():
+                (target / name).write_bytes(source.read_bytes())
+        written, kept = sorted(written + kept), []
+
+    for name, blob in held.items():
+        (target / name).write_bytes(blob)
+
+    return written, kept, before, set_version(target)
+
+
 def write_instances(target: Path, facts: dict[str, str], name: str | None, force: bool) -> list[str]:
     written: list[str] = []
     for template_rel, instance_rel in TEMPLATES.items():
@@ -281,6 +358,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--set", action="append", default=[], metavar="key=value",
                         help="a fact for the context file; repeatable")
     parser.add_argument("--force", action="store_true", help="overwrite instance files that already exist")
+    parser.add_argument("--upgrade", action="store_true",
+                        help="refresh the set in a repository that already adopted it, "
+                             "keeping every file that repository owns")
+    parser.add_argument("--refresh-capabilities", action="store_true",
+                        help="with --upgrade, also replace agent definitions and skills "
+                             "with the set's, losing any local change to them")
     parser.add_argument("--from-template", action="store_true",
                         help="finish a repository made with GitHub's \"Use this template\": "
                              "remove the file that makes the tree claim to be the set, and "
@@ -295,6 +378,36 @@ def main(argv: list[str] | None = None) -> int:
         facts[key.strip()] = value.strip()
 
     target = (args.into or SET_ROOT).resolve()
+
+    if args.upgrade:
+        if not args.into:
+            raise SystemExit("--upgrade needs --into: it refreshes another repository.")
+        if target == SET_ROOT:
+            raise SystemExit("--upgrade refreshes a repository that adopted the set, not the set itself.")
+        if args.from_template:
+            raise SystemExit("--upgrade and --from-template are different jobs; run one.")
+
+        written, kept, before, after = upgrade(target, args.refresh_capabilities)
+        print(f"[upgrade] {target}: {before} → {after}")
+        for path in sorted(PRESERVED):
+            if (target / path).is_file():
+                print(f"[keep] {path} is this repository's; the set did not write over it")
+        for path in written:
+            print(f"[copy] {path}")
+
+        stale = stale_capabilities(target, kept)
+        for path in stale:
+            print(f"[stale] {path} differs from the set's and was left alone — "
+                  f"this repository keeps running its own version")
+        if stale:
+            print("        --refresh-capabilities replaces them, losing those local changes.")
+
+        print()
+        return subprocess.run(
+            [sys.executable, str(target / ".ai" / "tools" / "check_policy_set.py"), str(target)],
+            check=False,
+        ).returncode
+
     target.mkdir(parents=True, exist_ok=True)
 
     if args.from_template:
