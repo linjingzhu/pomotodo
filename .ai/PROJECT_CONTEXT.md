@@ -928,6 +928,26 @@ commands → the compile and build ladder and every report; `generated` →
   while paused. Minute bars shows one bar per minute of the phase, so a
   1-minute test phase shows a single bar (by design).
 
+- Verified: window-size feature interactions, per the owner. New
+  test/e2e/size-interactions.js runs the real main.js under Xvfb WITH a
+  window manager (openbox, so fullscreen actually fills the screen) and
+  real xdotool edge drags: 16 scenarios / 48 checks, all pass -
+  fullscreen round trips restore exact bounds (default, custom, pinned);
+  pin refuses edge drags before and after fullscreen and fullscreen still
+  works pinned; panel open/close grows to 780 and gives back exactly the
+  growth (also when the panel is opened or closed while fullscreen, and
+  when the window was dragged taller meanwhile); Reset Size from
+  fullscreen and while pinned; Match-to-image-ratio survives panel and
+  fullscreen round trips and works pinned; Esc leaves fullscreen; a rapid
+  double toggle doesn't stick; move/resize are refused while fullscreen;
+  closing with the panel open saves the base size. Two first-run FAILs
+  were test mistakes, not app bugs: a south-east drag from a window whose
+  bottom already sits on the screen edge can't move the cursor further
+  (fixed: drag the top edge), and fitPanel only moves the window up when
+  the bottom would go off screen. Not in npm test (needs a display, a WM
+  and xdotool); results go to test/e2e/out/ (gitignored). Lesson: never
+  `pkill -f` a pattern that also appears in the shell's own command line.
+
 ## Permanently excluded scope
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer
