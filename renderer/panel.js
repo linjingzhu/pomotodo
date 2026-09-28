@@ -345,7 +345,7 @@
   let monthRequest = 0;
 
   // Level 0 is under an hour of focus that day (no color); each further
-  // hour is one darker step, capped at the 4th (4h or more).
+  // hour is one more saturated step, capped at the 4th (4h or more).
   function level(sec) {
     return Math.min(4, Math.floor(Math.max(0, sec) / 3600));
   }

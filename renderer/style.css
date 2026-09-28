@@ -259,6 +259,40 @@ main {
   initial-value: 360deg;
 }
 
+/* The canvas-drawn gauge styles (renderer.js GAUGE_DRAW). It overhangs
+   the ring by GAUGE_PAD (12px) so glows aren't clipped at its edge. */
+#ring-canvas {
+  position: absolute;
+  inset: -12px;
+  width: calc(100% + 24px);
+  height: calc(100% + 24px);
+  display: none;
+  pointer-events: none;
+}
+#app[data-gauge-kind="canvas"] #ring-canvas { display: block; }
+#app[data-gauge-kind="canvas"] #ring-glow,
+#app[data-gauge-kind="canvas"] #timer-ring svg { display: none; }
+
+/* Ink digits: the numbers themselves drain. Filled in the accent up to
+   --ink-level (the time left), a bright hairline at the waterline, dim
+   above it; a thin outline keeps the drained part readable. text-shadow
+   would show through the transparent fill, so it goes. */
+#app[data-gauge="ink"]:not([data-state="idle"]) #timer-display {
+  --ink-level: 100%;
+  --ink-alpha: 1;
+  color: transparent;
+  text-shadow: none;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.5);
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--accent) calc(var(--ink-alpha) * 100%), transparent) 0 var(--ink-level),
+    rgba(255, 255, 255, calc(var(--ink-alpha) * 0.9)) var(--ink-level) calc(var(--ink-level) + 1.5px),
+    rgba(255, 255, 255, 0.22) calc(var(--ink-level) + 1.5px)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
 #ring-glow {
   position: absolute;
   inset: 0;
@@ -898,25 +932,28 @@ select:focus {
   box-shadow: none;
   backdrop-filter: none;
 }
-/* Focus time that day: a sequential ramp in the key color's hue, more
-   focus = brighter. Each step has a fixed OKLCH lightness and capped
-   chroma, so for any key color the steps stay evenly apart and the first
-   clears the panel at >= 2:1 (dataviz ordinal ramp checks, run for eight
-   key colors). Day numbers: white on step 1, dark ink on 2-4, >= 4.5:1. */
-:is(.cal-day, .cal-swatch).level-1 { background: oklch(from var(--key) 0.52 min(c, 0.16) h); }
-:is(.cal-day, .cal-swatch).level-2 { background: oklch(from var(--key) 0.65 min(c, 0.16) h); }
-:is(.cal-day, .cal-swatch).level-3 { background: oklch(from var(--key) 0.75 min(c, 0.16) h); }
-:is(.cal-day, .cal-swatch).level-4 { background: oklch(from var(--key) 0.86 min(c, 0.16) h); }
-.cal-day.level-2, .cal-day.level-3, .cal-day.level-4 { color: #1a1b24; font-weight: 600; }
+/* Focus time that day: a ramp in the key color's hue where more focus =
+   more saturated - pale and washed out for 1h, the key color itself at 4h+.
+   Chroma is a share of the key's own (20/45/72/100%) and lightness steps
+   down 0.87 -> 0.665: the key's full chroma only fits in sRGB near its own
+   lightness (a lighter vivid step would be clipped for blue/purple). For
+   eight key colors, measured from rendered pixels: chroma rises every
+   step, the dataviz ordinal checks pass (one hue, monotone L, dL >= 0.06,
+   >= 2:1 on a dark panel), and dark day numbers are >= 4.5:1 on all four. */
+:is(.cal-day, .cal-swatch).level-1 { background: oklch(from var(--key) 0.87 calc(c * 0.2) h); }
+:is(.cal-day, .cal-swatch).level-2 { background: oklch(from var(--key) 0.8 calc(c * 0.45) h); }
+:is(.cal-day, .cal-swatch).level-3 { background: oklch(from var(--key) 0.73 calc(c * 0.72) h); }
+:is(.cal-day, .cal-swatch).level-4 { background: oklch(from var(--key) 0.665 c h); }
+.cal-day.level-1, .cal-day.level-2, .cal-day.level-3, .cal-day.level-4 { color: #1a1b24; font-weight: 600; }
 /* Today in bright orange: the ring always, the number where it stays
-   readable (the empty and darkest steps). The selected day keeps the
+   readable (the empty step; the colored steps take dark ink). The selected day keeps the
    white outline, drawn inside the orange ring when both apply. */
 .cal-day.today {
   color: #ffa53d;
   font-weight: 700;
   border: 2px solid #ffa53d;
 }
-.cal-day.today.level-2, .cal-day.today.level-3, .cal-day.today.level-4 { color: #1a1b24; }
+.cal-day.today.level-1, .cal-day.today.level-2, .cal-day.today.level-3, .cal-day.today.level-4 { color: #1a1b24; }
 /* The ramp's key: Less [0][1][2][3][4] More, thresholds in the tooltips. */
 #cal-legend {
   display: flex;

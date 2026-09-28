@@ -885,6 +885,83 @@ commands → the compile and build ladder and every report; `generated` →
   handshake, whether performance.now() advances across sleep, Windows 10
   support in Electron 44 / Chromium 152, lists over the rounded corners.
 
+- Changed: calendar heatmap, per the owner ("higher saturation = longer
+  work"). The 1.0.9 ramp kept chroma flat (<= 0.16) and raised lightness
+  (0.52 -> 0.86), so 4h+ read as the palest step. New ramp: chroma is a
+  share of the key's own (20/45/72/100%) and lightness steps DOWN 0.87 ->
+  0.665 - more work = more saturated, 4h+ = the key color itself. Lightness
+  had to fall, not rise: the key's full chroma only exists in sRGB near its
+  own lightness, and a lighter vivid top step was clipped for blue/purple
+  (measured: dL < 0.06, chroma no longer rising). All day numbers now take
+  dark ink. Measured from rendered pixels for eight key colors on a dark
+  backdrop: chroma rises every step, dataviz ordinal checks pass (one hue,
+  monotone L, dL >= 0.06, strongest step >= 4.8:1 vs panel), numbers >=
+  5:1. With a white desktop behind the panel the strongest step is
+  1.55-1.86:1 vs the (then gray) panel - below the 2:1 floor, but up from
+  1.04-1.15:1 for the old ramp.
+
+- Added: five gauge styles from the owner's chosen concept page (Time
+  disk, Glow ring, Tick dial, Minute beads, Liquid), selectable in
+  Settings > Gauge style beside Filled pie and Stroke. Drawn on one
+  <canvas> (#ring-canvas, overhanging the ring by 12px so glows aren't
+  clipped) from the same state the CSS styles use; the CSS pie/stroke
+  and the SVG track are hidden while a canvas style is active
+  (data-gauge-kind). The 600ms refill-from-12 sweep is reproduced with an
+  ease-out. Only Liquid animates between ticks (a ripple while running,
+  ~20 fps, none with prefers-reduced-motion); every other style redraws
+  from render(). Minute beads reads focusInCycle/longBreakEvery for its
+  cycle dots. Verified in the real app under Xvfb: all 7 styles in
+  idle/running/paused/break, the refill sweep on Tick dial, Liquid 23
+  draws/s running and 0 paused, Tick dial 0 draws/s paused.
+
+- Added: eight more gauge styles from the two follow-up concept pages
+  (minimal F-I: Hairline ring, Dashed arc, Sundial, Minute bars;
+  typographic J-M: Ink digits, Halo, Top arc, Underline bar), 15 in all.
+  Seven draw on the gauge canvas like A-E; Ink digits is CSS on
+  #timer-display (background-clip: text with --ink-level/--ink-alpha set
+  from the same gauge state, text-shadow dropped since it would show
+  through the transparent fill), so drawGauge computes the state before
+  it needs a canvas. Cycle dots are shared by Minute beads and Top arc
+  (gaugeCycleDots). Verified in the real app under Xvfb: all 15 styles
+  in idle/running/paused/break (zoomed check of Ink at 70% remaining and
+  paused), Liquid 22.5 draws/s running, every other style 0 draws/s
+  while paused. Minute bars shows one bar per minute of the phase, so a
+  1-minute test phase shows a single bar (by design).
+
+- Verified: window-size feature interactions, per the owner. New
+  test/e2e/size-interactions.js runs the real main.js under Xvfb WITH a
+  window manager (openbox, so fullscreen actually fills the screen) and
+  real xdotool edge drags: 16 scenarios / 48 checks, all pass -
+  fullscreen round trips restore exact bounds (default, custom, pinned);
+  pin refuses edge drags before and after fullscreen and fullscreen still
+  works pinned; panel open/close grows to 780 and gives back exactly the
+  growth (also when the panel is opened or closed while fullscreen, and
+  when the window was dragged taller meanwhile); Reset Size from
+  fullscreen and while pinned; Match-to-image-ratio survives panel and
+  fullscreen round trips and works pinned; Esc leaves fullscreen; a rapid
+  double toggle doesn't stick; move/resize are refused while fullscreen;
+  closing with the panel open saves the base size. Two first-run FAILs
+  were test mistakes, not app bugs: a south-east drag from a window whose
+  bottom already sits on the screen edge can't move the cursor further
+  (fixed: drag the top edge), and fitPanel only moves the window up when
+  the bottom would go off screen. Not in npm test (needs a display, a WM
+  and xdotool); results go to test/e2e/out/ (gitignored). Lesson: never
+  `pkill -f` a pattern that also appears in the shell's own command line.
+
+- Extended the window-size interaction test with 6 more scenarios
+  targeting "Match window to image ratio" specifically, per the owner
+  ("이미지 사이즈에 맞추는 것도" - fit-to-image-size too): calling fitAspect
+  while ALREADY fullscreen (not via a round trip) exits to windowed at
+  the fitted size; a plain edge drag still works after a fit (not
+  implicitly pinned); Reset Size after a fit returns to the TRUE default,
+  not the fit's ratio; two fits in a row each recompute from the CURRENT
+  bounds, not stale state (2:1 keep-width -> 340x173, then 1:1 keep-
+  height correctly computes 173x173 but clamps up to MIN_SIZE 180x180 -
+  first-run expectation was wrong here, not an app bug); an extreme
+  ratio that needs scaling DOWN to fit the screen (not just up to
+  MIN_SIZE) still preserves the exact target ratio; a fit survives two
+  panel open/close cycles with no drift. 62/62 checks pass.
+
 ## Permanently excluded scope
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer

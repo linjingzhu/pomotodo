@@ -134,3 +134,30 @@ test('pausing right after an unnoticed sleep does not count the sleep gap', asyn
   assert.equal(app.get('timer-display').textContent, '24:20');
   assert.equal(app.get('app').dataset.state, 'paused');
 });
+
+test('canvas gauge styles swap out the CSS gauge and back', async () => {
+  const app = createRenderer();
+  await app.flush();
+  for (const [style, kind] of [['ticks', 'canvas'], ['liquid', 'canvas'], ['stroke', 'css'], ['pie', 'css'], ['disk', 'canvas'], ['hairline', 'canvas'], ['dashes', 'canvas'], ['sundial', 'canvas'], ['bars', 'canvas'], ['ink', 'canvas'], ['halo', 'canvas'], ['arc', 'canvas'], ['bar', 'canvas']]) {
+    app.get('gauge-style').value = style;
+    app.emit('gauge-style', 'change');
+    assert.equal(app.get('app').dataset.gauge, style);
+    assert.equal(app.get('app').dataset.gaugeKind, kind);
+  }
+  app.emit('start-pause-btn', 'click');
+  app.advance(1_000); // drawing without a real canvas must not throw
+  assert.equal(app.get('app').dataset.state, 'running');
+});
+
+test('the ink gauge drives the digits fill level and clears it when left', async () => {
+  const app = createRenderer();
+  await app.flush();
+  app.get('gauge-style').value = 'ink';
+  app.emit('gauge-style', 'change');
+  app.emit('start-pause-btn', 'click');
+  for (let i = 0; i < 15; i++) app.advance(60_000); // 15 of 25 minutes, in steps under the sleep gap
+  assert.equal(app.get('timer-display').style['--ink-level'], '40%');
+  app.get('gauge-style').value = 'pie';
+  app.emit('gauge-style', 'change');
+  assert.equal(app.get('timer-display').style['--ink-level'], undefined);
+});
