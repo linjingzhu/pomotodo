@@ -948,6 +948,20 @@ commands → the compile and build ladder and every report; `generated` →
   and xdotool); results go to test/e2e/out/ (gitignored). Lesson: never
   `pkill -f` a pattern that also appears in the shell's own command line.
 
+- Extended the window-size interaction test with 6 more scenarios
+  targeting "Match window to image ratio" specifically, per the owner
+  ("이미지 사이즈에 맞추는 것도" - fit-to-image-size too): calling fitAspect
+  while ALREADY fullscreen (not via a round trip) exits to windowed at
+  the fitted size; a plain edge drag still works after a fit (not
+  implicitly pinned); Reset Size after a fit returns to the TRUE default,
+  not the fit's ratio; two fits in a row each recompute from the CURRENT
+  bounds, not stale state (2:1 keep-width -> 340x173, then 1:1 keep-
+  height correctly computes 173x173 but clamps up to MIN_SIZE 180x180 -
+  first-run expectation was wrong here, not an app bug); an extreme
+  ratio that needs scaling DOWN to fit the screen (not just up to
+  MIN_SIZE) still preserves the exact target ratio; a fit survives two
+  panel open/close cycles with no drift. 62/62 checks pass.
+
 ## Permanently excluded scope
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer

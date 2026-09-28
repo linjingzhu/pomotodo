@@ -185,6 +185,58 @@ app.on('browser-window-created', (_e, win) => {
       check('16 close with panel open saves base size (growth removed)', settings().windowWidth === 360 && settings().windowHeight === 490, `${settings().windowWidth}x${settings().windowHeight} (window ${before.width}x${before.height})`);
       await panel(false);
       await invariants('16');
+
+      // 17. fit aspect called while ALREADY fullscreen (not via a round trip):
+      // exits fullscreen and lands windowed at the fitted size
+      await api('resetSize()'); await sleep(200);
+      await toFS();
+      check('17 setup: actually fullscreen', win.isFullScreen() === true);
+      const fit17 = await api("fitAspect('width', 1600, 900)"); await sleep(700);
+      check('17 fit while fullscreen: exits to windowed at fitted size', !win.isFullScreen() && (await fs_()) === false && sizeIs(b(), 340, 194), JSON.stringify(b()));
+      check('17 fit while fullscreen: return value matches', fit17 && fit17.width === 340 && fit17.height === 194, JSON.stringify(fit17));
+      await api('resetSize()'); await sleep(200);
+
+      // 18. after fitting, a plain edge drag still works (not implicitly locked)
+      await api("fitAspect('width', 1600, 900)"); await sleep(200);
+      const b18 = b(); await dragSE(40, 40);
+      check('18 drag still works after a fit (not implicitly pinned)', b().width === b18.width + 40 && b().height === b18.height + 40, JSON.stringify(b()));
+      await api('resetSize()'); await sleep(200);
+
+      // 19. Reset Size after a fit returns to the TRUE default, not the fitted size
+      await api("fitAspect('height', 900, 1600)"); await sleep(200);
+      const b19 = b();
+      check('19 setup: fitted to a non-default size', !sizeIs(b19, DEF.width, DEF.height), JSON.stringify(b19));
+      await api('resetSize()'); await sleep(300);
+      check('19 reset after fit: true default, not the fit ratio', sizeIs(b(), DEF.width, DEF.height), JSON.stringify(b()));
+
+      // 20. sequential fits with different ratios/keep modes each recompute
+      // from the CURRENT bounds (the second is not based on the first image)
+      const s20a = await api("fitAspect('width', 2, 1)"); await sleep(200); // 2:1 keep width -> 340x173
+      check('20a first fit (2:1 keep width)', s20a.width === 340 && s20a.height === 173, JSON.stringify(s20a));
+      // square keep height: from 173 tall, a bare 173x173 is below MIN_SIZE.width
+      // (180), so it scales up to 180x180 - still recomputed from 20a's
+      // post-fit bounds (173), not from the original 470 or a stale value
+      const s20b = await api("fitAspect('height', 1, 1)"); await sleep(200);
+      check('20b second fit uses the post-20a bounds, clamped up to MIN_SIZE', s20b.width === 180 && s20b.height === 180, JSON.stringify(s20b));
+      await api('resetSize()'); await sleep(200);
+
+      // 21. an extreme ratio that needs scaling DOWN to fit the screen (not
+      // just up to MIN_SIZE, as in scenario 12) still preserves the ratio
+      await dragSE(area.width - DEF.width - 100, 0); await sleep(100); // widen close to the screen
+      const wideBounds = b();
+      const fit21 = await api('fitAspect(\'width\', 1, 3)'); await sleep(300); // tall portrait keep-width
+      const r21 = (b().width - 6) / (b().height - 6);
+      check('21 down-scaled fit still hits the target ratio', Math.abs(r21 - 1 / 3) < 0.01, `ratio=${r21.toFixed(3)} bounds=${JSON.stringify(b())} from=${JSON.stringify(wideBounds)}`);
+      check('21 down-scaled fit stays within the work area', b().width <= area.width && b().height <= area.height, JSON.stringify(b()));
+      check('21 return value matches window', fit21.width === b().width && fit21.height === b().height, JSON.stringify(fit21));
+      await api('resetSize()'); await sleep(200);
+
+      // 22. fit -> toggle the panel open/closed twice in a row -> no drift
+      const fit22 = await api("fitAspect('width', 4, 3)"); await sleep(200);
+      await panel(true); await panel(false); await panel(true); await panel(false);
+      check('22 fit size survives two panel open/close cycles', sizeIs(b(), fit22.width, fit22.height), `expected ${JSON.stringify(fit22)} got ${JSON.stringify(b())}`);
+      await api('resetSize()'); await sleep(200);
+      await invariants('22');
     } catch (e) { out('ERR ' + e.stack); fails++; }
     out(`DONE fails=${fails}`);
     app.exit(0);
