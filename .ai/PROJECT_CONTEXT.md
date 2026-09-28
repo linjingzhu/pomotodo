@@ -914,6 +914,20 @@ commands → the compile and build ladder and every report; `generated` →
   idle/running/paused/break, the refill sweep on Tick dial, Liquid 23
   draws/s running and 0 paused, Tick dial 0 draws/s paused.
 
+- Added: eight more gauge styles from the two follow-up concept pages
+  (minimal F-I: Hairline ring, Dashed arc, Sundial, Minute bars;
+  typographic J-M: Ink digits, Halo, Top arc, Underline bar), 15 in all.
+  Seven draw on the gauge canvas like A-E; Ink digits is CSS on
+  #timer-display (background-clip: text with --ink-level/--ink-alpha set
+  from the same gauge state, text-shadow dropped since it would show
+  through the transparent fill), so drawGauge computes the state before
+  it needs a canvas. Cycle dots are shared by Minute beads and Top arc
+  (gaugeCycleDots). Verified in the real app under Xvfb: all 15 styles
+  in idle/running/paused/break (zoomed check of Ink at 70% remaining and
+  paused), Liquid 22.5 draws/s running, every other style 0 draws/s
+  while paused. Minute bars shows one bar per minute of the phase, so a
+  1-minute test phase shows a single bar (by design).
+
 ## Permanently excluded scope
 
 - No macOS/Linux packaging unless explicitly requested — Windows installer

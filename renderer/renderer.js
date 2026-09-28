@@ -181,7 +181,7 @@
     gauge.style = style;
     el.app.dataset.gauge = style;
     el.app.dataset.gaugeKind = CANVAS_GAUGES.includes(style) ? 'canvas' : 'css';
-    if (style !== 'ink') el.timerDisplay.style.removeProperty('--ink-level');
+    if (style !== 'ink') for (const p of ['--ink-level', '--ink-alpha']) el.timerDisplay.style.removeProperty(p);
     drawGauge();
   }
 
