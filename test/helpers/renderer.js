@@ -19,6 +19,7 @@ function createRenderer(overrides = {}) {
       value: '', checked: false, textContent: '', title: '', disabled: false,
       dataset: {}, children: [], options: [], style: {
         setProperty(name, value) { this[name] = value; },
+        removeProperty(name) { delete this[name]; },
         getPropertyValue(name) { return this[name] || ''; },
       },
       classList: {

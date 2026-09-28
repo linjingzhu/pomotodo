@@ -273,6 +273,26 @@ main {
 #app[data-gauge-kind="canvas"] #ring-glow,
 #app[data-gauge-kind="canvas"] #timer-ring svg { display: none; }
 
+/* Ink digits: the numbers themselves drain. Filled in the accent up to
+   --ink-level (the time left), a bright hairline at the waterline, dim
+   above it; a thin outline keeps the drained part readable. text-shadow
+   would show through the transparent fill, so it goes. */
+#app[data-gauge="ink"]:not([data-state="idle"]) #timer-display {
+  --ink-level: 100%;
+  --ink-alpha: 1;
+  color: transparent;
+  text-shadow: none;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.5);
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--accent) calc(var(--ink-alpha) * 100%), transparent) 0 var(--ink-level),
+    rgba(255, 255, 255, calc(var(--ink-alpha) * 0.9)) var(--ink-level) calc(var(--ink-level) + 1.5px),
+    rgba(255, 255, 255, 0.22) calc(var(--ink-level) + 1.5px)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
 #ring-glow {
   position: absolute;
   inset: 0;

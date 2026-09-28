@@ -166,7 +166,7 @@
   // degrees clockwise from 12 o'clock, idle shows no color, paused dims the
   // marks to 40%, breaks use the break color. Sizes are designed for a
   // 190px ring and scaled with it.
-  const CANVAS_GAUGES = ['disk', 'glow', 'ticks', 'beads', 'liquid'];
+  const CANVAS_GAUGES = ['disk', 'glow', 'ticks', 'beads', 'liquid', 'hairline', 'dashes', 'sundial', 'bars', 'ink', 'halo', 'arc', 'bar'];
   const GAUGE_PAD = 12; // the canvas overhangs the ring so glows aren't cut off
   const SWEEP_MS = 600; // matches the CSS styles' --ring-end refill
   const gauge = { style: 'pie', canvas: null, ctx: null, sweepAt: -Infinity, raf: 0, lastWave: 0, colorKey: '', warm: '' };
@@ -181,6 +181,7 @@
     gauge.style = style;
     el.app.dataset.gauge = style;
     el.app.dataset.gaugeKind = CANVAS_GAUGES.includes(style) ? 'canvas' : 'css';
+    if (style !== 'ink') el.timerDisplay.style.removeProperty('--ink-level');
     drawGauge();
   }
 
@@ -223,24 +224,6 @@
 
   function drawGauge() {
     if (!CANVAS_GAUGES.includes(gauge.style)) return;
-    if (!gauge.canvas) {
-      const canvas = document.getElementById('ring-canvas');
-      if (!canvas || typeof canvas.getContext !== 'function') return;
-      gauge.canvas = canvas;
-      gauge.ctx = canvas.getContext('2d');
-    }
-    const { canvas, ctx } = gauge;
-    const cssW = canvas.clientWidth;
-    if (!cssW) return;
-    const dpr = window.devicePixelRatio || 1;
-    const px = Math.round(cssW * dpr);
-    if (canvas.width !== px || canvas.height !== px) { canvas.width = px; canvas.height = px; }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, px, px);
-    const S = cssW - GAUGE_PAD * 2;
-    const k = S / 190;
-    ctx.setTransform(dpr, 0, 0, dpr, GAUGE_PAD * dpr, GAUGE_PAD * dpr);
-
     const state = timerState();
     const fraction = Math.max(0, Math.min(1, remainingMs / phaseDurationMs));
     let start = 360 * (1 - fraction);
@@ -248,10 +231,29 @@
     const sweep = (performance.now() - gauge.sweepAt) / SWEEP_MS;
     if (sweep >= 0 && sweep < 1) { start = 0; end = 360 * (1 - (1 - sweep) ** 3); } // ease-out refill from 12
     const v = {
-      S, k, C: S / 2, R: S * 0.46, start, end, span: Math.max(0, end - start) / 360,
-      idle: state === 'idle', paused: state === 'paused', col: gaugeColors(),
+      start, end, span: Math.max(0, end - start) / 360,
+      idle: state === 'idle', paused: state === 'paused',
       minutes: Math.max(1, Math.round(phaseDurationMs / 60000)),
     };
+    if (!gauge.canvas) {
+      const canvas = document.getElementById('ring-canvas');
+      if (canvas && typeof canvas.getContext === 'function') { gauge.canvas = canvas; gauge.ctx = canvas.getContext('2d'); }
+    }
+    const { canvas, ctx } = gauge;
+    const cssW = canvas ? canvas.clientWidth : 0;
+    if (canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const px = Math.round(cssW * dpr);
+      if (canvas.width !== px || canvas.height !== px) { canvas.width = px; canvas.height = px; }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, px, px);
+      const S = cssW - GAUGE_PAD * 2;
+      Object.assign(v, { S, k: S / 190, C: S / 2, R: S * 0.46 });
+      ctx.setTransform(dpr, 0, 0, dpr, GAUGE_PAD * dpr, GAUGE_PAD * dpr);
+    }
+    if (gauge.style === 'ink') { GAUGE_DRAW.ink(null, v); return; } // CSS-driven, needs no canvas
+    if (!cssW) return;
+    v.col = gaugeColors();
     GAUGE_DRAW[gauge.style](ctx, v);
     if (gauge.style === 'liquid' && running) scheduleGaugeFrame();
   }
@@ -266,6 +268,50 @@
     ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.lineWidth = width;
     ctx.stroke();
+  }
+
+  function gaugeDim(ctx, v) {
+    ctx.globalAlpha = v.paused ? 0.4 : 1;
+  }
+
+  const gaugePolar = (v, deg, radius) => [v.C + radius * Math.cos(gaugeRad(deg)), v.C + radius * Math.sin(gaugeRad(deg))];
+
+  function gaugeIndex12(ctx, v, alpha) {
+    ctx.beginPath(); ctx.moveTo(v.C, v.C - v.R - 3 * v.k); ctx.lineTo(v.C, v.C - v.R + 3 * v.k);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; ctx.lineWidth = 1; ctx.lineCap = 'butt'; ctx.stroke();
+  }
+
+  function gaugeDot(ctx, x, y, color, haloRadius, radius) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, haloRadius);
+    g.addColorStop(0, color); g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    const a = ctx.globalAlpha;
+    ctx.globalAlpha = a * 0.55; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, haloRadius, 0, TAU); ctx.fill();
+    ctx.globalAlpha = a; ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.fill();
+  }
+
+  // '#rrggbb' -> 'rgba(...)'; the accent always resolves to hex or rgb().
+  function gaugeAlpha(color, alpha) {
+    const m = /^#([0-9a-f]{6})$/i.exec(color);
+    if (m) { const n = parseInt(m[1], 16); return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha.toFixed(3)})`; }
+    return color.replace(/^rgba?\(([^)]+?)(?:,[^,]*)?\)$/, (_, rgb) => `rgba(${rgb.split(',').slice(0, 3).join(',')}, ${alpha.toFixed(3)})`);
+  }
+
+  // The long-break cycle as a row of dots: filled = focus sessions done,
+  // ring = the one running, faint = still to come.
+  function gaugeCycleDots(ctx, v, y, spacing, radius) {
+    const every = Math.max(2, Number(el.longBreakEvery.value || 4));
+    const done = Math.min(every, focusInCycle);
+    const sp = Math.min(spacing, (v.R * 1.1) / every);
+    const r = Math.min(radius, sp * 0.3);
+    for (let i = 0; i < every; i++) {
+      const x = v.C + (i - (every - 1) / 2) * sp;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
+      if (i < done) { ctx.fillStyle = v.idle ? 'rgba(255, 255, 255, 0.55)' : userAccentColor; gaugeDim(ctx, v); ctx.fill(); }
+      else if (i === done && mode === 'work') { ctx.strokeStyle = v.idle ? 'rgba(255, 255, 255, 0.55)' : userAccentColor; ctx.lineWidth = Math.max(1.2, r * 0.45); gaugeDim(ctx, v); ctx.stroke(); }
+      else { ctx.fillStyle = 'rgba(255, 255, 255, 0.22)'; ctx.fill(); }
+      ctx.restore();
+    }
   }
 
   function gaugeMarks(ctx, v, blur) {
@@ -370,17 +416,139 @@
         ctx.beginPath(); ctx.arc(C, C, rr, gaugeRad(from), gaugeRad(to));
         ctx.strokeStyle = v.col.main; ctx.lineWidth = w; ctx.stroke(); ctx.restore();
       }
-      const every = Math.max(2, Number(el.longBreakEvery.value || 4));
-      const done = Math.min(every, focusInCycle);
-      const spacing = Math.min(13 * k, (R * 1.1) / every);
-      const y = C + R * 0.42;
-      for (let i = 0; i < every; i++) {
-        const x = C + (i - (every - 1) / 2) * spacing;
-        ctx.beginPath(); ctx.arc(x, y, Math.min(3.6 * k, spacing * 0.3), 0, TAU);
-        if (i < done) { ctx.fillStyle = v.idle ? 'rgba(255, 255, 255, 0.55)' : userAccentColor; ctx.fill(); }
-        else if (i === done && mode === 'work') { ctx.strokeStyle = v.idle ? 'rgba(255, 255, 255, 0.55)' : userAccentColor; ctx.lineWidth = 1.6 * k; ctx.stroke(); }
-        else { ctx.fillStyle = 'rgba(255, 255, 255, 0.22)'; ctx.fill(); }
+      gaugeCycleDots(ctx, v, C + R * 0.42, 13 * k, 3.6 * k);
+    },
+
+    // F: a hairline track, a 2px remaining arc, one bright dot at "now".
+    hairline(ctx, v) {
+      const { C, R, k } = v;
+      gaugeCircle(ctx, v, R, k, 0.10);
+      gaugeIndex12(ctx, v, 0.35);
+      const [x, y] = gaugePolar(v, v.start, R);
+      if (v.idle) { ctx.fillStyle = 'rgba(255, 255, 255, 0.35)'; ctx.beginPath(); ctx.arc(C, C - R, 2.5 * k, 0, TAU); ctx.fill(); return; }
+      ctx.save(); gaugeDim(ctx, v); ctx.lineCap = 'round';
+      if (v.span > 0.002) { ctx.beginPath(); ctx.arc(C, C, R, gaugeRad(v.start), gaugeRad(v.end)); ctx.strokeStyle = v.col.main; ctx.lineWidth = 2 * k; ctx.stroke(); }
+      gaugeDot(ctx, x, y, v.col.warm, 12 * k, 2.5 * k);
+      ctx.restore();
+    },
+
+    // G: the elapsed part as faint dashes, the remaining part a solid arc.
+    dashes(ctx, v) {
+      const { C, R, k } = v;
+      gaugeIndex12(ctx, v, 0.25);
+      ctx.save();
+      ctx.lineCap = 'butt'; ctx.setLineDash([1.5 * k, 5 * k]); ctx.lineWidth = 2 * k; ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.beginPath(); ctx.arc(C, C, R, gaugeRad(0), gaugeRad(v.idle ? 360 : v.start)); ctx.stroke();
+      ctx.restore();
+      if (v.idle || v.span <= 0.002) return;
+      ctx.save(); gaugeDim(ctx, v); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(C, C, R, gaugeRad(v.start), gaugeRad(v.end)); ctx.strokeStyle = v.col.main; ctx.lineWidth = 3 * k; ctx.stroke();
+      ctx.restore();
+    },
+
+    // H: one thin hand plus the remaining sector shaded at 10%.
+    sundial(ctx, v) {
+      const { C, R, k } = v;
+      gaugeCircle(ctx, v, R, k, 0.10);
+      gaugeIndex12(ctx, v, 0.35);
+      const inner = R * 0.5;
+      ctx.save(); ctx.lineCap = 'round';
+      if (v.idle) {
+        ctx.beginPath(); ctx.moveTo(...gaugePolar(v, 0, inner)); ctx.lineTo(...gaugePolar(v, 0, R));
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'; ctx.lineWidth = 1.5 * k; ctx.stroke(); ctx.restore(); return;
       }
+      const a = v.paused ? 0.4 : 1;
+      if (v.span > 0.002) {
+        ctx.globalAlpha = 0.10 * a; ctx.fillStyle = v.col.main;
+        ctx.beginPath(); ctx.moveTo(C, C); ctx.arc(C, C, R - 0.5 * k, gaugeRad(v.start), gaugeRad(v.end)); ctx.closePath(); ctx.fill();
+      }
+      ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.moveTo(...gaugePolar(v, v.start, inner)); ctx.lineTo(...gaugePolar(v, v.start, R));
+      ctx.strokeStyle = v.col.main; ctx.lineWidth = 1.5 * k; ctx.stroke();
+      const [x, y] = gaugePolar(v, v.start, R);
+      ctx.fillStyle = v.col.warm; ctx.beginPath(); ctx.arc(x, y, 2.5 * k, 0, TAU); ctx.fill();
+      ctx.restore();
+    },
+
+    // I: one thin bar per minute; passed bars go dim, the current one fades.
+    bars(ctx, v) {
+      const { R, k } = v;
+      const n = v.minutes, len = (n <= 10 ? 14 : 10) * k, elapsed = 1 - v.span;
+      ctx.save(); ctx.lineWidth = 2 * k; ctx.lineCap = 'butt';
+      for (let i = 0; i < n; i++) {
+        const ang = (i + 0.5) * 360 / n, lo = i / n, hi = (i + 1) / n;
+        let col = 'rgba(255, 255, 255, 0.12)', alpha = 1;
+        if (!v.idle) {
+          if (elapsed < lo) col = v.col.main;
+          else if (elapsed < hi) { col = v.col.main; alpha = 0.35 + 0.65 * (hi - elapsed) * n; }
+          if (col === v.col.main && v.paused) alpha *= 0.4;
+        }
+        ctx.globalAlpha = alpha; ctx.strokeStyle = col;
+        ctx.beginPath(); ctx.moveTo(...gaugePolar(v, ang, R - len)); ctx.lineTo(...gaugePolar(v, ang, R)); ctx.stroke();
+      }
+      ctx.restore();
+    },
+
+    // J: no ring; the digits themselves drain (CSS on #timer-display, see
+    // style.css) - the level is the time left.
+    ink(_ctx, v) {
+      const level = v.idle ? 100 : Math.round(v.span * 1000) / 10;
+      el.timerDisplay.style.setProperty('--ink-level', `${level}%`);
+      el.timerDisplay.style.setProperty('--ink-alpha', v.paused ? '0.4' : '1');
+    },
+
+    // K: a glow behind the digits that shrinks and fades, plus a hairline
+    // ring with an end dot for the exact reading.
+    halo(ctx, v) {
+      const { C, R, k } = v;
+      gaugeCircle(ctx, v, R, k, v.idle ? 0.10 : 0.08);
+      if (v.idle || v.span <= 0) return;
+      ctx.save(); gaugeDim(ctx, v);
+      const gr = (34 + 52 * v.span) * k, a = 0.10 + 0.32 * v.span;
+      const g = ctx.createRadialGradient(C, C, 0, C, C, gr);
+      g.addColorStop(0, gaugeAlpha(v.col.main, a)); g.addColorStop(0.55, gaugeAlpha(v.col.main, a * 0.45)); g.addColorStop(1, gaugeAlpha(v.col.main, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(C, C, gr, 0, TAU); ctx.fill();
+      ctx.lineWidth = 1.5 * k; ctx.lineCap = 'round'; ctx.strokeStyle = v.col.main;
+      ctx.beginPath(); ctx.arc(C, C, R, gaugeRad(v.start), gaugeRad(v.end)); ctx.stroke();
+      const [x, y] = gaugePolar(v, v.start, R);
+      ctx.fillStyle = v.col.warm; ctx.beginPath(); ctx.arc(x, y, 2.5 * k, 0, TAU); ctx.fill();
+      ctx.restore();
+    },
+
+    // L: a single 120deg arc across the top, plus the long-break cycle as
+    // dots under the digits.
+    arc(ctx, v) {
+      const { C, k } = v;
+      const R = v.R * 0.91, a0 = -60, span = 120;
+      ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = 5 * k;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${v.idle ? 0.10 : 0.08})`;
+      ctx.beginPath(); ctx.arc(C, C, R, gaugeRad(a0), gaugeRad(a0 + span)); ctx.stroke();
+      if (!v.idle && v.span > 0) {
+        gaugeDim(ctx, v);
+        const s = a0 + span * (1 - v.span);
+        const g = ctx.createLinearGradient(C - R, 0, C + R, 0);
+        g.addColorStop(0, v.col.warm); g.addColorStop(1, v.col.main);
+        ctx.strokeStyle = g; ctx.beginPath(); ctx.arc(C, C, R, gaugeRad(s), gaugeRad(a0 + span)); ctx.stroke();
+      }
+      ctx.restore();
+      gaugeCycleDots(ctx, v, C + v.R * 0.375, 12 * k, 2.5 * k);
+    },
+
+    // M: no circle; a 2px bar under the digits with a bright end cap.
+    bar(ctx, v) {
+      const { C, R, k } = v;
+      const w = R * 1.27, x0 = C - w / 2, x1 = C + w / 2, y = C + R * 0.3;
+      ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = 2 * k;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${v.idle ? 0.14 : 0.10})`;
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+      if (!v.idle && v.span > 0) {
+        gaugeDim(ctx, v);
+        const xs = x0 + w * (1 - v.span);
+        ctx.strokeStyle = v.col.main; ctx.beginPath(); ctx.moveTo(xs, y); ctx.lineTo(x1, y); ctx.stroke();
+        ctx.shadowColor = v.col.main; ctx.shadowBlur = 6 * k;
+        ctx.fillStyle = v.col.warm; ctx.beginPath(); ctx.arc(xs, y, 3 * k, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
     },
 
     // The level is the time left; a slow ripple only while running.
