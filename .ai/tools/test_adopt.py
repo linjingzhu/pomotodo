@@ -13,6 +13,7 @@ Standard library only:
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -46,6 +47,14 @@ def run_checker_in(root: Path) -> tuple[int, str]:
     return result.returncode, result.stdout + result.stderr
 
 
+def upgrade(target: Path, *extra: str) -> tuple[int, str]:
+    result = subprocess.run(
+        [sys.executable, str(ADOPT), "--upgrade", "--into", str(target), *extra],
+        capture_output=True, text=True, check=False,
+    )
+    return result.returncode, result.stdout + result.stderr
+
+
 def adopt(target: Path, facts: dict[str, str] | None = None, *extra: str) -> tuple[int, str]:
     argv = [sys.executable, str(ADOPT), "--into", str(target), *extra]
     for key, value in (facts or {}).items():
@@ -54,8 +63,32 @@ def adopt(target: Path, facts: dict[str, str] | None = None, *extra: str) -> tup
     return result.returncode, result.stdout + result.stderr
 
 
+TEMPLATE_ONLY = (
+    '"Use this template" copies the set\'s own repository, '
+    "and a copy of an adopting repository is not that tree"
+)
+# Tests skipped in a repository that adopted the set, each with its reason.
+# They run unconditionally at the set's home. Every other test must pass in an
+# adopter too, and a test is listed only because its subject exists only at
+# the set's home — never to make a suite green. The guard suite's list says the
+# same, and may also name a known blind spot with the roadmap item tracking it.
+# This list is the one place a reviewer has to read.
+NEEDS_THE_SETS_HOME = {
+    "test_template_tree_fails_before_the_mode_runs": TEMPLATE_ONLY,
+    "test_from_template_makes_it_pass": TEMPLATE_ONLY,
+    "test_from_template_reseeds_the_denylist": TEMPLATE_ONLY,
+    "test_from_template_warns_that_the_readme_is_still_the_sets": TEMPLATE_ONLY,
+    "test_from_template_without_a_name_warns_instead_of_silently_keeping_seeds": TEMPLATE_ONLY,
+    "test_from_template_removes_only_the_marker": TEMPLATE_ONLY,
+}
+AT_SET_HOME = (ROOT / "LESSONS_FROM_PRACTICE.md").exists()
+
+
 class AdoptTests(unittest.TestCase):
     def setUp(self) -> None:
+        reason = NEEDS_THE_SETS_HOME.get(self._testMethodName)
+        if reason and not AT_SET_HOME:
+            self.skipTest(f"needs the set's home: {reason}")
         self.tmp = Path(tempfile.mkdtemp(prefix="adopt-"))
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.target = self.tmp / "project"
@@ -211,6 +244,215 @@ class AdoptTests(unittest.TestCase):
                     existing,
                 )
 
+    # -- upgrading a repository that already adopted the set ---------------
+    def test_re_running_adoption_destroys_the_adopters_denylist(self) -> None:
+        """The defect --upgrade exists for, asserted before the fix is used.
+
+        Plain adoption copies `.ai/` wholesale, and the set ships its own
+        denylist. Re-running it over a lived-in tree replaces that repository's
+        product names with the set's seeds, and its portability check goes on
+        passing while proving nothing.
+        """
+        adopt(self.target, FACTS)
+        denylist = self.target / ".ai" / "tools" / "portability-denylist.txt"
+        denylist.write_text("Widget\nWidgetCorp\n", encoding="utf-8")
+        adopt(self.target, FACTS)
+        self.assertNotIn("Widget", denylist.read_text(encoding="utf-8"))
+
+    def test_upgrade_keeps_what_the_repository_owns(self) -> None:
+        adopt(self.target, FACTS)
+        denylist = self.target / ".ai" / "tools" / "portability-denylist.txt"
+        lessons = self.target / ".ai" / "memory" / "PROJECT_LESSONS.md"
+        roadmap = self.target / ".ai" / "ROADMAP.md"
+        denylist.write_text("Widget\nWidgetCorp\n", encoding="utf-8")
+        roadmap.write_text("# Roadmap\n\n## Widget importer\n", encoding="utf-8")
+        lessons.write_text(lessons.read_text(encoding="utf-8") + "\n## Widget parser\n", encoding="utf-8")
+        context = self.context()
+
+        code, out = upgrade(self.target)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(denylist.read_text(encoding="utf-8"), "Widget\nWidgetCorp\n")
+        self.assertIn("Widget importer", roadmap.read_text(encoding="utf-8"))
+        self.assertIn("Widget parser", lessons.read_text(encoding="utf-8"))
+        self.assertEqual(self.context(), context)
+
+    def test_upgrade_updates_the_policy_documents(self) -> None:
+        # The other half: keeping the repository's files is only useful if the
+        # set's own documents actually move.
+        adopt(self.target, FACTS)
+        core = self.target / ".ai" / "CORE.md"
+        core.write_text("---\ndoc_id: ai-core\nversion: 0.0.1\n"
+                        "canonical_path: .ai/CORE.md\nupdated: 2020-01-01\n---\n\n# Stale\n",
+                        encoding="utf-8")
+        upgrade(self.target)
+        self.assertEqual(
+            core.read_text(encoding="utf-8"),
+            (ROOT / ".ai" / "CORE.md").read_text(encoding="utf-8"),
+        )
+
+    def test_upgrade_reports_the_version_it_moved(self) -> None:
+        adopt(self.target, FACTS)
+        _, out = upgrade(self.target)
+        self.assertIn("[upgrade]", out)
+
+    def test_upgrade_leaves_a_diverged_capability_alone_and_says_so(self) -> None:
+        adopt(self.target, FACTS)
+        agent = self.target / ".claude" / "agents" / "fast-explorer.md"
+        mine = "---\nname: fast-explorer\ndescription: mine\n---\n\nMine.\n"
+        agent.write_text(mine, encoding="utf-8")
+        _, out = upgrade(self.target)
+        self.assertEqual(agent.read_text(encoding="utf-8"), mine)
+        self.assertIn("[stale]", out)
+
+    def test_refresh_capabilities_replaces_a_diverged_one(self) -> None:
+        adopt(self.target, FACTS)
+        agent = self.target / ".claude" / "agents" / "fast-explorer.md"
+        agent.write_text("---\nname: fast-explorer\ndescription: mine\n---\n", encoding="utf-8")
+        upgrade(self.target, "--refresh-capabilities")
+        self.assertEqual(
+            agent.read_text(encoding="utf-8"),
+            (ROOT / ".claude" / "agents" / "fast-explorer.md").read_text(encoding="utf-8"),
+        )
+
+    def test_upgrade_refuses_a_tree_that_never_adopted(self) -> None:
+        code, out = upgrade(self.target)
+        self.assertNotEqual(code, 0)
+        self.assertIn("has not adopted the set", out)
+
+    def test_upgrade_refuses_the_sets_own_home(self) -> None:
+        code, out = upgrade(ROOT)
+        self.assertNotEqual(code, 0)
+        self.assertIn("not the set itself", out)
+
+    # -- instance files never travel ---------------------------------------
+    # A run at the set's home can write a roadmap or a report there. Those are
+    # the set's own records; copying `.ai/` must not hand them to every
+    # repository adopted or upgraded afterwards as if they were its own.
+    def source_with_instances(self) -> Path:
+        source = self.tmp / "set"
+        shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+        ai = source / ".ai"
+        (ai / "ROADMAP.md").write_text("# Roadmap\n\n## THE SET'S OWN ITEM\n", encoding="utf-8")
+        (ai / "reports" / "2026-10-09-the-sets-run.md").write_text("# THE SET'S OWN REPORT\n", encoding="utf-8")
+        (ai / "PROJECT_CONTEXT.md").write_text("# THE SET'S OWN CONTEXT\n", encoding="utf-8")
+        (ai / "memory" / "PROJECT_LESSONS.md").write_text("# THE SET'S OWN LESSONS\n", encoding="utf-8")
+        return source
+
+    def run_from(self, source: Path, *argv: str) -> tuple[int, str]:
+        result = subprocess.run(
+            [sys.executable, str(source / ".ai" / "tools" / "adopt.py"), *argv],
+            capture_output=True, text=True, check=False,
+        )
+        return result.returncode, result.stdout + result.stderr
+
+    def assert_none_of_the_sets_records(self) -> None:
+        ai = self.target / ".ai"
+        self.assertFalse((ai / "ROADMAP.md").exists(), "the set's roadmap travelled")
+        self.assertFalse((ai / "reports" / "2026-10-09-the-sets-run.md").exists(), "the set's report travelled")
+        self.assertNotIn("THE SET'S OWN CONTEXT", self.context())
+        self.assertNotIn("THE SET'S OWN LESSONS",
+                         (ai / "memory" / "PROJECT_LESSONS.md").read_text(encoding="utf-8"))
+
+    def test_adoption_does_not_carry_the_sources_instance_files(self) -> None:
+        source = self.source_with_instances()
+        facts = [a for k, v in FACTS.items() for a in ("--set", f"{k}={v}")]
+        code, out = self.run_from(source, "--into", str(self.target), *facts)
+        self.assertEqual(code, 0, out)
+        self.assert_none_of_the_sets_records()
+
+    def test_upgrade_does_not_carry_the_sources_instance_files(self) -> None:
+        adopt(self.target, FACTS)
+        code, out = self.run_from(self.source_with_instances(), "--upgrade", "--into", str(self.target))
+        self.assertEqual(code, 0, out)
+        self.assert_none_of_the_sets_records()
+
+    def test_running_the_tools_leaves_no_bytecode_behind(self) -> None:
+        # `adopt.py` imports the checker, and Python caches what it imports.
+        # A tool that travels into other people's repositories must not leave
+        # a compiled cache in them, or carry one from the source into the next
+        # repository it adopts.
+        source = self.source_with_instances()
+        facts = [a for k, v in FACTS.items() for a in ("--set", f"{k}={v}")]
+        self.run_from(source, "--into", str(self.target), *facts)
+        self.assertFalse((source / ".ai" / "tools" / "__pycache__").exists(),
+                         "running adopt.py wrote a bytecode cache at the source")
+        (source / ".ai" / "tools" / "__pycache__").mkdir()
+        (source / ".ai" / "tools" / "__pycache__" / "stale.cpython-311.pyc").write_bytes(b"x")
+        second = self.tmp / "second"
+        self.run_from(source, "--into", str(second), *facts)
+        self.assertFalse((second / ".ai" / "tools" / "__pycache__").exists(),
+                         "a bytecode cache at the source travelled into the target")
+
+    def test_keep_is_reported_only_for_what_the_target_already_had(self) -> None:
+        # The upgrade report once claimed a roadmap it had just copied in was
+        # "this repository's". It may say so only of a file that was there.
+        adopt(self.target, FACTS)
+        source = self.source_with_instances()
+        _, out = self.run_from(source, "--upgrade", "--into", str(self.target))
+        self.assertNotIn("[keep] .ai/ROADMAP.md", out)
+        roadmap = self.target / ".ai" / "ROADMAP.md"
+        roadmap.write_text("# Roadmap\n\n## THIS REPOSITORY'S ITEM\n", encoding="utf-8")
+        _, out = self.run_from(source, "--upgrade", "--into", str(self.target))
+        self.assertIn("[keep] .ai/ROADMAP.md", out)
+        self.assertIn("THIS REPOSITORY'S ITEM", roadmap.read_text(encoding="utf-8"))
+
+    def test_every_home_only_test_exists(self) -> None:
+        stale = [name for name in NEEDS_THE_SETS_HOME if not hasattr(self, name)]
+        self.assertEqual(stale, [], "listed as needing the set's home, but no such test")
+
+    # -- an adopter's own edit to a policy document is named before it goes --
+    # An upgrade overwrites the set's documents. One the adopter edited would
+    # go with it, visible only in a diff nobody was told to read.
+    def edit_doc(self, rel: str, *, version: str | None = None) -> None:
+        path = self.target / rel
+        text = path.read_text(encoding="utf-8")
+        if version is not None:
+            text = re.sub(r"^version: .*$", f"version: {version}", text, count=1, flags=re.M)
+        path.write_text(text + "\nA rule this repository added for itself.\n", encoding="utf-8")
+
+    def test_upgrade_names_an_unbumped_local_edit(self) -> None:
+        adopt(self.target, FACTS)
+        self.edit_doc(".ai/REVIEW.md")
+        _, out = upgrade(self.target)
+        self.assertIn("[local] .ai/REVIEW.md", out)
+
+    def test_upgrade_names_a_local_edit_that_bumped_its_version(self) -> None:
+        # The adopter who followed the versioning rule must not be the one
+        # whose edit disappears without a word.
+        adopt(self.target, FACTS)
+        self.edit_doc(".ai/REVIEW.md", version="99.0.0")
+        _, out = upgrade(self.target)
+        self.assertIn("[local] .ai/REVIEW.md", out)
+
+    def test_upgrade_does_not_flag_a_document_that_is_merely_older(self) -> None:
+        adopt(self.target, FACTS)
+        self.edit_doc(".ai/REVIEW.md", version="0.0.1")
+        _, out = upgrade(self.target)
+        self.assertNotIn("[local] .ai/REVIEW.md", out)
+
+    def test_an_untouched_upgrade_flags_nothing(self) -> None:
+        adopt(self.target, FACTS)
+        _, out = upgrade(self.target)
+        self.assertNotIn("[local]", out)
+
+    def test_an_older_changelog_is_not_mistaken_for_a_local_edit(self) -> None:
+        # The release record grows every release while its own version stays
+        # put, so every older copy of it has the same version and other text.
+        adopt(self.target, FACTS)
+        changelog = self.target / ".ai" / "CHANGELOG.md"
+        text = changelog.read_text(encoding="utf-8")
+        first = text.index("\n## ", text.index("\n---\n"))
+        second = text.index("\n## ", first + 1)
+        changelog.write_text(text[:first] + text[second:], encoding="utf-8")
+        _, out = upgrade(self.target)
+        self.assertNotIn("[local] .ai/CHANGELOG.md", out)
+
+    def test_a_local_flag_says_what_it_cannot_tell(self) -> None:
+        adopt(self.target, FACTS)
+        self.edit_doc(".ai/REVIEW.md")
+        _, out = upgrade(self.target)
+        self.assertIn("cannot tell", out)
+
     # -- the instance files ------------------------------------------------
     def test_template_instructions_do_not_survive(self) -> None:
         adopt(self.target, FACTS)
@@ -301,7 +543,10 @@ class AdoptTests(unittest.TestCase):
 
     def test_from_template_removes_only_the_marker(self) -> None:
         tree = self.template_tree()
-        self.from_template(tree, "--name", "Acme Web")
+        code, out = self.from_template(tree, "--name", "Acme Web")
+        # Without this the test passes when the mode refuses to run at all:
+        # the marker was never there to remove.
+        self.assertEqual(code, 0, out)
         self.assertFalse((tree / "LESSONS_FROM_PRACTICE.md").exists())
         # The adopter's front page is reported, never deleted.
         self.assertTrue((tree / "README.md").exists())

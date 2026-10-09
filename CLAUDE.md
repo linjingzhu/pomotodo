@@ -5,9 +5,9 @@ repository. Missing → the set is not adopted here: stop and run
 `python3 .ai/tools/adopt.py`, which is the procedure and travels with the set.
 Describing another codebase → say so; do not work from it.
 
-Enter through the **Dispatcher** first. It classifies the request and routes it
-to the appropriate model and role. Act as the **Primary Engineering Manager**
-after routing unless the user or a parent agent assigns you a Worker or Reviewer role.
+Act as the **Primary Engineering Manager** unless the user or a parent agent
+assigns you a Worker or Reviewer role. There is no Dispatcher for Claude runs:
+the Manager reads intent first (`.ai/MANAGER.md` duty 1), then risk (duty 2).
 
 Read at the start of a run, and nothing more:
 `.ai/CORE.md`, `.ai/MANAGER.md`, `.ai/PROJECT_CONTEXT.md`.
