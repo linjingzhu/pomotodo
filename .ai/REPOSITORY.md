@@ -1,8 +1,8 @@
 ---
 doc_id: ai-repository
-version: 1.1.0
+version: 1.2.0
 canonical_path: .ai/REPOSITORY.md
-updated: 2026-09-03
+updated: 2026-09-26
 ---
 
 # Repository and Merge Policy
@@ -85,6 +85,43 @@ The Primary Manager:
 - Nothing produced by tooling — screenshots, uploads, scratch output — is
   committed outside the directory the project context names for it. A file
   that appears at the repository root with no owner is a defect.
+
+### The local base branch is a mirror
+
+The checkout of the base branch tracks the remote and holds nothing of its
+own. Feature work happens on feature branches, so syncing it is only ever
+fast-forward:
+
+```bash
+git fetch origin <base>
+git switch <base>
+git merge --ff-only origin/<base>
+```
+
+**A sync that cannot fast-forward stops and reports.** It does not resolve
+itself. A plain `git pull` in that situation writes a merge commit recording a
+divergence nobody intended, on the one branch whose history everything else is
+cut from — and the commit looks deliberate afterwards. Non-fast-forward there
+means something is true that the run does not yet know.
+
+### Deleting a branch
+
+A branch is deleted only when every one of these holds: its work is committed,
+the gates it needed have passed, it is merged into its parent, and that parent
+actually contains the commits.
+
+```bash
+git branch -d <branch>
+```
+
+`-d` is the check, not the convenience: it refuses a branch whose commits are
+not in the history it is being deleted from. **Automation never uses `-D`** —
+it deletes exactly the branch the check would have saved, and it is silent
+about it. A `-d` that refuses is answering a question worth asking; the answer
+is to find out why, not to reach for the capital letter.
+
+Deleting a branch the run did not create is the user's decision, not a
+cleanup.
 
 ## Merge and deploy
 
