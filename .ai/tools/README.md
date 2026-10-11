@@ -1,6 +1,6 @@
 ---
 doc_id: ai-tools
-version: 2.6.0
+version: 2.7.0
 canonical_path: .ai/tools/README.md
 updated: 2026-10-10
 ---
@@ -98,15 +98,14 @@ prints `[SKIP]` and why, and does not count as passed.
 - **Whether a skill is invoked when it should be.** Nothing structural can see
   that. A skill that must not start on its own says so in its own text, and
   whether a run honoured it is visible only in what the run did.
-- **In an adopter, whether a reference into a capability folder resolves.** The
-  check excuses it even when the folder is present, because it cannot tell a
-  capability the adopter removed from one that never existed. Excusing only an
-  absent folder would close the gap and open another: the set's own documents
-  name seven capability files individually, so an adopter that removed one and
-  kept its folder would fail on documents it cannot durably edit. A pointer
-  written *inside* a capability is checked. Tracked as item R8 of the roadmap
-  in the set's own `.ai/ROADMAP.md`, which stays at the set's home like every
-  instance file, so an adopter will not find it in its own tree.
+- **In a repository adopted before 4.0.0, whether a reference into a
+  capability folder resolves.** Without a lock nothing tells a capability the
+  adopter removed from one that never existed, so every such reference is
+  excused there. In a subscriber the lock decides: only a capability it
+  records as removed, or as kept because the repository holds its own in that
+  place, is excused, and every other dangling reference fails as it does at
+  the set's home. A pointer written *inside* a capability is checked either
+  way.
 - **In a subscriber, files the lock does not name.** A document added to `.ai/`
   there is not reported, and a capability the repository already had before
   adoption is its own. A repository adopted before 4.0.0 has no lock until its
@@ -270,7 +269,12 @@ repository's:
   capability included, like a policy document. Without a lock the upgrade
   falls back to comparing versions, as above, and says what that cannot tell;
 - a capability the repository removed is recorded as `removed: <path>` and
-  is not delivered again, by that upgrade or any later one.
+  is not delivered again, by that upgrade or any later one. One the set ships
+  but the repository holds its own version of, or lacks inside its own skill,
+  is recorded as `kept: <path>`;
+- the cross-reference check reads both: a pointer into a capability folder is
+  excused only when it names a capability recorded as removed or kept, or one
+  delivered and since taken out.
 
 A rule only one repository needs goes in its project context, under the
 heading `.ai/PROJECT_CONTEXT.template.md` § *Local rules* describes. A rule

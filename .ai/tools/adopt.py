@@ -451,6 +451,14 @@ def write_lock(target: Path, in_place: bool = False, removed: frozenset[str] = f
     source, commit = ("unknown (adopted in place)", "unknown") if in_place else set_source()
     names = subscribed_files(target)
     gone = sorted(n for n in removed if not (target / n).exists() and (SET_ROOT / n).is_file())
+    # Every other capability the set ships and this delivery did not leave
+    # here as the set's: the repository holds its own in that place.
+    kept = sorted(
+        path.relative_to(SET_ROOT).as_posix()
+        for top in CAPABILITIES if (SET_ROOT / top).exists()
+        for path in ([SET_ROOT / top] if (SET_ROOT / top).is_file() else sorted((SET_ROOT / top).rglob("*")))
+        if path.is_file() and path.relative_to(SET_ROOT).as_posix() not in set(names) | set(gone)
+    )
     lines = [
         "# Written by .ai/tools/adopt.py. The files below are this repository's",
         "# subscription to the policy set: they are replaced on every upgrade, so",
@@ -462,6 +470,7 @@ def write_lock(target: Path, in_place: bool = False, removed: frozenset[str] = f
         "",
         *(f"{digest((target / name).read_bytes())}  {name}" for name in names),
         *(f"removed: {name}" for name in gone),
+        *(f"kept: {name}" for name in kept),
     ]
     (target / LOCK).write_text("\n".join(lines) + "\n", encoding="utf-8")
     return len(names)
@@ -473,8 +482,11 @@ def locked_state(target: Path) -> tuple[list[str], frozenset[str]] | None:
     lock = target / LOCK
     if not lock.is_file():
         return None
-    _, entries, gone, _ = read_lock(lock.read_text(encoding="utf-8"))
-    edited, removed = [], {n for n in gone if removable(n) and not (target / n).exists()}
+    _, entries, marks, _ = read_lock(lock.read_text(encoding="utf-8"))
+    edited, removed = [], {
+        n for n, mark in marks.items()
+        if mark == "removed" and removable(n) and not (target / n).exists()
+    }
     for name, want in sorted(entries.items()):
         here = target / name
         if here.is_file():

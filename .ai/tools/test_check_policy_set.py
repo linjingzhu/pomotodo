@@ -70,10 +70,10 @@ NEEDS_THE_SETS_HOME = {
     "test_missing_codex_capabilities_are_reported_at_set_home":
         "the set must ship its Codex capabilities; an adopter may remove them",
     "test_codex_entry_references_are_checked":
-        "KNOWN BLIND SPOT, roadmap item R8 at the set's home — in an adopter a reference into a "
-        "capability folder is not checked, even with the folder present, "
-        "because the check cannot tell a removed capability from one that "
-        "never existed",
+        "KNOWN BLIND SPOT, only in a repository adopted before 4.0.0 — without "
+        "`.ai/set.lock` a reference into a capability folder is not checked, "
+        "because nothing tells a removed capability from one that never "
+        "existed. Its next upgrade writes the lock, and the test then runs",
 }
 AT_SET_HOME = (ROOT / "LESSONS_FROM_PRACTICE.md").exists()
 
@@ -81,6 +81,8 @@ AT_SET_HOME = (ROOT / "LESSONS_FROM_PRACTICE.md").exists()
 class GuardTests(unittest.TestCase):
     def setUp(self) -> None:
         reason = NEEDS_THE_SETS_HOME.get(self._testMethodName)
+        if reason and reason.startswith("KNOWN BLIND SPOT") and (ROOT / ".ai" / "set.lock").exists():
+            reason = None  # a subscriber's lock closes the blind spot
         if reason and not AT_SET_HOME:
             # A blind spot does not need the set's home; it names itself.
             blind_spot = reason.startswith("KNOWN BLIND SPOT")
@@ -893,6 +895,41 @@ class GuardTests(unittest.TestCase):
         lock = self.subscribe()
         lock.write_text(lock.read_text(encoding="utf-8") + "0" * 64 + "  ../elsewhere.md\n", encoding="utf-8")
         self.assert_fails_with("names `../elsewhere.md`")
+
+    # -- check 2 in a subscriber: references into capability folders -------
+    def test_in_a_subscriber_a_pointer_to_no_capability_fails(self) -> None:
+        self.subscribe()
+        self.edit("AGENTS.md", lambda t: t + "\nRead `.codex/agents/missing.toml`.\n")
+        self.assert_fails_with("references `.codex/agents/missing.toml`, which does not exist")
+
+    def test_in_a_subscriber_a_removed_capability_is_excused(self) -> None:
+        # Delivered, as the lock records, then taken out: the set's own
+        # documents still point at it, and that is the repository's choice.
+        self.subscribe()
+        (self.copy / ".claude" / "agents" / "fast-explorer.md").unlink()
+        code, out = run_checker(self.copy)
+        self.assertEqual(code, 0, out)
+        self.assertIn("[PASS] cross-references", out)
+
+    def excused_by_mark(self, mark: str, name: str) -> None:
+        lock = self.subscribe()
+        lock.write_text(lock.read_text(encoding="utf-8") + f"{mark}: {name}\n", encoding="utf-8")
+        (self.copy / name).unlink()
+        code, out = run_checker(self.copy)
+        self.assertEqual(code, 0, out)
+
+    def test_in_a_subscriber_a_recorded_removal_is_excused(self) -> None:
+        self.excused_by_mark("removed", ".claude/agents/adversarial-reviewer.md")
+
+    def test_in_a_subscriber_a_capability_kept_as_its_own_is_excused(self) -> None:
+        # The repository had its own skill there, so the set withheld this file.
+        self.excused_by_mark("kept", ".agents/skills/auto-dev/agents/openai.yaml")
+
+    def test_in_a_subscriber_an_unrecorded_missing_capability_fails(self) -> None:
+        # Never delivered and never recorded: the set points at nothing.
+        self.subscribe()
+        (self.copy / ".claude" / "agents" / "adversarial-reviewer.md").unlink()
+        self.assert_fails_with("references `.claude/agents/adversarial-reviewer.md`, which does not exist")
 
     def test_without_a_lock_the_question_is_not_asked(self) -> None:
         self.subscribe()

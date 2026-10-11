@@ -257,14 +257,34 @@ def check_front_matter(report: Report) -> None:
 # set lives, tolerated where it does not. This is the same set-home distinction
 # as SET_HOME_FILES, reached from the other direction.
 #
-# The tolerance is wider than "absent", and that is a known blind spot. In an
-# adopter, a reference *into* a capability folder is excused even when the
-# folder is there, because the check cannot tell a capability the adopter
-# removed from one that never existed. A pointer written *inside* a capability
-# is still checked; see `resolve()`.
+# In a subscriber the lock says which capabilities were delivered, so the
+# tolerance is exact there: a reference into a capability folder is excused
+# only when it names a capability the repository removed — one the lock
+# records as removed, or lists as delivered and is now gone — or one the lock
+# records as kept, because the repository holds its own in that place.
+# Anything else that does not resolve is a broken pointer, as at the set's
+# home.
+#
+# Without a lock, a repository adopted before 4.0.0, nothing tells a removed
+# capability from one that never existed, and every reference into a
+# capability folder is still excused. That blind spot closes at its next
+# upgrade, which writes the lock. A pointer written *inside* a capability is
+# checked either way; see `resolve()`.
 TRAVELLING_DIRS = (
     ".claude/agents/", ".claude/skills/", ".codex/agents/", ".agents/skills/",
 )
+
+
+def removed_capability(path: str) -> bool:
+    """Whether `path` names a capability the set ships and this repository does
+    not hold as the set's: one it removed, or one in a place it keeps its own.
+    Either is its choice, and leaves the set's pointers to it dangling. True
+    for every path where no lock says what was delivered."""
+    lock = ROOT / LOCK
+    if not lock.is_file():
+        return True
+    _, entries, marks, _ = read_lock(lock.read_text(encoding="utf-8"))
+    return path in marks or (path in entries and not (ROOT / path).exists())
 
 
 def resolve(ref: str, source: Path) -> tuple[Path | None, bool]:
@@ -307,7 +327,8 @@ def resolve(ref: str, source: Path) -> tuple[Path | None, bool]:
             return candidate, False
         if is_instance(as_rel):
             return None, True
-        if as_rel.startswith(TRAVELLING_DIRS) and not at_set_home() and not beside_capability:
+        if (as_rel.startswith(TRAVELLING_DIRS) and not at_set_home()
+                and not beside_capability and removed_capability(as_rel)):
             return None, True
     return None, False
 
@@ -1006,35 +1027,42 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
 
 
-def read_lock(text: str) -> tuple[dict[str, str], dict[str, str], list[str], list[str]]:
+LOCK_MARKS = ("removed", "kept")
+
+
+def read_lock(text: str) -> tuple[dict[str, str], dict[str, str], dict[str, str], list[str]]:
     """Returns the header fields, the digest of each delivered path, the
-    capabilities the repository removed, and the lines that are none of
-    these. A removal is recorded as `removed: <path>`, so that it outlives the
-    upgrade that first saw it."""
+    capabilities the set ships but did not deliver here, and the lines that
+    are none of these.
+
+    The third maps a path to why it was not delivered: `removed` when the
+    repository took out a capability it had been given, `kept` when it holds
+    its own in that place. Both outlive the upgrade that first saw them."""
     header: dict[str, str] = {}
     entries: dict[str, str] = {}
-    removed: list[str] = []
+    marks: dict[str, str] = {}
     problems: list[str] = []
     for number, line in enumerate(text.splitlines(), 1):
         if not line.strip() or line.startswith("#"):
             continue
         entry = LOCK_ENTRY.match(line)
         field = KEY_LINE.match(line)
-        if entry or (field and field.group(1) == "removed"):
+        if entry or (field and field.group(1) in LOCK_MARKS):
             name = entry.group(2) if entry else field.group(2).strip()
-            if name in entries or name in removed:
+            if name in entries or name in marks:
                 problems.append(f"line {number} lists `{name}` a second time")
             elif entry:
                 entries[name] = entry.group(1)
             else:
-                removed.append(name)
+                marks[name] = field.group(1)
         elif field and field.group(1) in LOCK_HEADER:
             header[field.group(1)] = field.group(2).strip()
         else:
             problems.append(
-                f"line {number} is neither a header field, `<sha256>  <path>` nor `removed: <path>`: {line}"
+                f"line {number} is neither a header field, `<sha256>  <path>`, "
+                f"`removed: <path>` nor `kept: <path>`: {line}"
             )
-    return header, entries, removed, problems
+    return header, entries, marks, problems
 
 
 def removable(name: str) -> bool:
@@ -1058,19 +1086,19 @@ def check_subscription(report: Report) -> None:
         )
         return
 
-    header, entries, gone, problems = read_lock(lock.read_text(encoding="utf-8"))
+    header, entries, marks, problems = read_lock(lock.read_text(encoding="utf-8"))
     failures = [f"{LOCK}: {p}" for p in problems]
     failures += [f"{LOCK}: no `{key}:` line" for key in LOCK_HEADER if not header.get(key)]
     if not entries:
         failures.append(f"{LOCK}: names no file")
 
     removed = 0
-    for name in sorted(gone):
+    for name, mark in sorted(marks.items()):
         if is_instance(name) or ".." in Path(name).parts or Path(name).is_absolute():
-            failures.append(f"{LOCK}: records `{name}` as removed, which the set never delivers")
+            failures.append(f"{LOCK}: records `{name}` as {mark}, which the set never delivers")
         elif not removable(name):
-            failures.append(f"{LOCK}: records `{name}` as removed, but only a capability may be")
-        elif not (ROOT / name).exists():
+            failures.append(f"{LOCK}: records `{name}` as {mark}, but only a capability may be")
+        elif mark == "removed" and not (ROOT / name).exists():
             removed += 1
     for name, want in sorted(entries.items()):
         path = ROOT / name
