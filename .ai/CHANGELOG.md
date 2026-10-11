@@ -40,6 +40,25 @@ for wording, examples and ordering that change nothing about what is required.
 
 ---
 
+## 4.1.0 — 2026-10-10
+
+Roadmap item R8, option B, chosen by the user on 2026-10-10. The lock 4.0.0
+introduced is the record of delivered capabilities that option needed.
+
+- the cross-reference check no longer excuses every reference into a
+  capability folder in a subscriber. It excuses one only when it names a
+  capability the repository removed, or one the set ships but the
+  repository holds its own version of. A pointer the set's documents or an
+  entry file make to a capability that is simply not there now fails, as it
+  does at the set's home. A repository adopted before 4.0.0 has no lock, and
+  keeps the old tolerance until its next upgrade writes one;
+- the lock records the second case as `kept: <path>`. Without it, a
+  repository with its own `auto-dev` skill would fail on the set's pointer to
+  the skill metadata the set withheld from it;
+- the test that exposed the blind spot now runs in every subscriber, and is
+  skipped only where no lock exists. Five new tests cover the check and one
+  the lock.
+
 ## 4.0.0 — 2026-10-10
 
 An adopting repository now subscribes to the set instead of owning a copy of

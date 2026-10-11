@@ -211,6 +211,10 @@ class AdoptTests(unittest.TestCase):
         self.assertEqual(skill.read_text(encoding="utf-8"), theirs)
         self.assertFalse((skill.parent / "agents" / "openai.yaml").exists())
         self.assertIn("[keep] .agents/skills/auto-dev/", out)
+        # The set's documents point at the file it withheld; the lock says the
+        # repository keeps its own skill there, which excuses that pointer.
+        self.assertIn("kept: .agents/skills/auto-dev/agents/openai.yaml",
+                      (self.target / ".ai" / "set.lock").read_text(encoding="utf-8"))
 
     def test_an_adopted_tree_passes_with_the_capabilities_it_received(self) -> None:
         # The end-to-end question: adoption copies agents and a skill, and the
